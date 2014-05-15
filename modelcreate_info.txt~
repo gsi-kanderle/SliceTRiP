@@ -1,0 +1,62 @@
+
+SlicerRtCommon: vtkLabelmaptoModelFilter
+Contours/MRML/ConvertContourRepresentation
+
+
+
+node = slicer.util.getNode('CTV*')
+>>> node
+(vtkMRMLScalarVolumeNode)0x48b38e8
+>>> node.GetName()
+'CTV1.1RUL_1_1'
+>>> mc = vtk.vtkMarchingCubes()
+>>> mc.SetInput(node)
+Traceback (most recent call last):
+  File "<console>", line 1, in <module>
+TypeError: argument 1: method requires a vtkDataObject, a vtkMRMLScalarVolumeNode was provided.
+>>> im = node.GetImageData()
+(set origin here)
+>>> mc.SetInput(im)
+>>> mc.SetNumberOfContours(1)
+>>> mc.SetValue(1,1/2)
+>>> mc.ComputeGradientsOff()
+>>> mc.ComputeNormalsOff()
+>>> mc.ComputeScalarsOff()
+>>> mc.Update()
+>>> mc.GetOutput().GetNumberOfPolys()
+0L
+>>> im.GetDimensions()
+(16, 14, 17)
+>>> mc.SetValue(1,14)
+>>> mc.Update()
+>>> mc.GetOutput().GetNumberOfPolys()
+903L
+>>> dec = vtk.vtkDecimatePro()
+>>> dec.SetInput(mc.GetOGetOutput())
+Traceback (most recent call last):
+  File "<console>", line 1, in <module>
+AttributeError: GetOGetOutput
+>>> dec.SetInput(mc.GetOutput())
+>>> dec.SetFeatureAngle(60)
+>>> dec.SplittingOff()
+>>> dec.PreserveTopologyOn()
+>>> dec.SetMaximumError(1)
+>>> dec.SetTargetReduction(1)
+>>> dec.Update
+<built-in method Update of vtkobject object at 0x7f3bd810e100>
+>>> dec.Update()
+>>> contourDN = slicer.vtkMRMLModelDisplayNode()
+>>> slicer.mrmlScene.AddNode(contourDN)
+(vtkMRMLModelDisplayNode)0x7f3bd810e260
+>>> contourDN.SliceIntersectionVisibilityOn()
+>>> contourDN.VisibilityOn()
+>>> contourDN.SetBackfaceCulling(0)
+>>> con = slicer.vtkMRMLModelNode()
+>>> slicer.mrmlScene.AddNode(con)
+(vtkMRMLModelNode)0x7f3bd810e208
+>>> con.SetAndObserveDisplayNodeID(contourDN.GetID())
+>>> con.SetAndObservePolyData(dec.GetOGetOutput())
+Traceback (most recent call last):
+  File "<console>", line 1, in <module>
+AttributeError: GetOGetOutput
+>>> con.SetAndObservePolyData(dec.GetOutput())

@@ -1,0 +1,268 @@
+import os, re
+import numpy as np
+
+
+class Voi():
+  def __init__(self,name,optDose=1):
+    self.name=name    
+    self.optDose = optDose
+    self.x=np.zeros(129)
+    self.y=np.zeros(129)
+    self.err=np.zeros(129)
+    # All dose values must be in Gy
+    self.minDose = 0
+    self.maxDose = 0
+    self.meanDose = 0
+    self.stdev = 0
+    self.mdian = 0
+    self.volume = 0 # in cc
+    self.voxVol=0
+    self.d10=0
+    self.d30=0
+    self.d95105=0
+    self.d99 = 0
+    self.dvhTableItems = []
+    self.perscDose = 0
+    self.perscVolume = 1
+    self.maxPerscDose = 0
+    self.rescaledVolume = 0
+    self.calcPerscDose = 0
+    self.overOarDose = False
+   
+  
+  def readTxtDvhFile(self, content, i):
+    n = len(content)
+    self.x = np.zeros(n-1)
+    self.y = np.zeros(n-1)
+    row = 1
+    while row < n:
+      line = content[row]
+      self.x[n] = line.split()[i]
+      self.y[n] = line.split()[i+1]
+      
+      row += 1
+    
+  #Function for creating difference between two voi values
+  def createVoiDifference(self,voi1,voi2):
+    if not voi1.volume == voi2.volume:
+      print "Volumes not the same for: " + self.name
+    self.volume = voi1.volume
+    
+    namesList = ['calcPerscDose','maxDose','meanDose','d10','d30']
+    for name in namesList:
+      difference = self.getDifferenceForMethodName(name,voi1,voi2)
+      setattr(self, name, difference)
+    
+
+  def getDifferenceForMethodName(self,name,voi1,voi2):
+    try:
+      method1 = getattr(voi1,name)
+      method2 = getattr(voi2,name)
+    except AttributeError:
+      print "Method: " + name + "cannot be found"
+      return None
+
+    return method1 - method2
+    
+    
+  def readTxtFile(self,line):
+    self.volume = round(float(line.split()[1]),2)
+    self.meanDose = round(float(line.split()[2]),2)
+    self.minDose = round(float(line.split()[3]),2)
+    self.maxDose = round(float(line.split()[4]),2)
+    if not line.split()[5] == "":
+      if self.name.find('ctv') > -1:
+	self.d99 = round(float(line.split()[5]),2)
+      else:
+        self.calcPerscDose = round(float(line.split()[5]),2)
+    if len(line.split()) > 7:
+      if not line.split()[6] == "":
+	self.d10 = round(float(line.split()[6]),2)
+      if not line.split()[7] == "":
+	self.d30 = round(float(line.split()[7]),2)
+  
+  def readGDFile(self,content,i):
+    line = content[i]
+    
+    if line is '':
+      return i
+      
+    #self.name = string.join(line.split()[1:],' ')
+    self.minDose = float(line.split()[2])*self.optDose
+    self.maxDose = round(float(line.split()[3]),2)*self.optDose
+    self.meanDose = float(line.split()[4])*self.optDose
+    self.stdev = float(line.split()[5])*self.optDose
+    self.mdian = float(line.split()[6])*self.optDose
+    self.volume = round(float(line.split()[7])/1000,2)
+    self.voxVol=float(line.split()[8])
+    i += 2
+    n=0
+    while i < len(content):
+      line = content[i]
+      if re.match("H:",line) is not None:
+	i += 1
+	continue
+      elif re.match("c:",line) is not None:
+        break
+      else:
+	if n>=129:
+	  break	  
+	self.x[n]=float(line.split()[0])
+	self.y[n]=float(line.split()[1])
+	self.err[n]=float(line.split()[1])
+	n += 1
+        #self.array.SetComponent(n, 0, float(line.split()[0]))
+        #self.array.SetComponent(n, 1, float(line.split()[1]))
+        #self.array.SetComponent(n, 2, float(line.split()[2]))
+        #n += 1
+        #if n>128:
+	  #self.array.SetNumberOfTuples(n)
+      i += 1
+      
+    self.x = np.array(self.x)*self.optDose/100
+    return i-1
+  
+  def calculateDose(self):
+    
+    # If doses are to small, ignore.
+    if self.maxDose < 1e-3:
+      return
+      
+    self.d10 = self.setValue(10)
+    #self.d10 = self.d10*dose
+    self.d30 = self.setValue(30)
+    self.d95105 = self.setValue(95) - self.setValue(105)
+    self.d99 = self.setValue(99)
+    
+    if not self.perscDose == 0:
+      percantage = self.perscVolume*1e2/self.volume
+      calcDose = self.setValue(percantage)
+      if calcDose > self.perscDose:
+	self.overOarDose = True
+      self.calcPerscDose = calcDose    
+        
+     
+  def setValue(self,value):
+    x=self.x
+    y=self.y
+    array = abs(y-value)
+    index = np.argmin(array)
+    if index:
+      result = x[index]
+      return round(result,2)
+    else:
+      return 0
+      
+    
+  def setDefaultVolumes(self,patientFlag):
+    if patientFlag == 0:
+      print "Wrong patient number!"
+      
+    if patientFlag < 10:
+      number = '0' + str(patientFlag)
+    else:
+      number = str(patientFlag)
+    filePath = '/u/kanderle/AIXd/Data/FC/Lung0' + number + '/Contour/voiVolumes.txt'
+    if os.path.isfile(filePath):
+      f = open(filePath,"r")
+      content = str(f.read())
+      f.close()
+      if content.find(self.name) > -1:
+        return
+    else:
+      content = ""
+
+    content += self.name + "\t" + str(self.volume) +"\n"
+    f = open(filePath,"wb+")
+    f.write(content)
+    f.close() 
+    
+  def setOarConstraints(self):
+    
+    # Function oarset makes a oar cell with specific oar names, volumes and doses.
+    # Make sure, that position of the oar name coresponds to volumes, maxdose and perscdose
+    
+    names=["spinalcord","heart","esophagus","stomach","smallerairways",
+           "aorta","largebronchus","lungs","lungl","lungr",
+           "liver","brachialplexus","vesselslarge","trachea","airwayslarge",
+           "carina","ivc","svc","airwayssmall","pulmonaryvessel",
+           "smallairways"]
+    if self.name.lower() in names:
+      index = names.index(self.name.lower())
+    else:
+      return
+           
+    perscVolume=[0.35,15,5,10,0.5,
+             10,4,1500,1500,1500,
+             700,3,10,4,4,
+             4,10,10,0.5,10,
+             0.5]
+    perscDose=[10,16,11.9,11.2,12.4,
+               31,10.5,7,7,7,
+               9.1,14,31,10.5,10.5,
+               10.5,31,31,12.4,31,
+               12.4]
+    maxPerscDose=[14,22,15.4,12.4,13.3,
+              37,20.2,0,0,0,
+              0,17.5,37,20.2,20.2,
+              20.2,37,37,13.3,37,
+              13.3]
+    self.perscDose = perscDose[index]
+    self.perscVolume = perscVolume[index]
+    self.maxPerscDose = maxPerscDose[index]
+    
+    if not self.maxPerscDose == 0 and self.maxDose > self.maxPerscDose:
+      self.overOarDose = True
+    
+    # Some VOI volumes differ in 4D CT and Planning CT (i.e. if it has less slices). So this flag is used for comparing VOI volumes.
+    # First you specified for which patient you want to check, then you input all volumes.
+    #If you don't know it, or don't need it, just input 0.
+    
+    
+  def setVolumes(self,patientFlag):
+    rescaledVolume = 0
+    if patientFlag == 0:
+      print "Wrong patient number!"
+      
+    if patientFlag < 10:
+      number = '0' + str(patientFlag)
+    else:
+      number = str(patientFlag)
+    filePath = '/u/kanderle/AIXd/Data/FC/Lung0' + number + '/Contour/voiVolumes.txt'
+    if os.path.isfile(filePath):
+      f = open(filePath,"r")
+      content = f.read().split('\n')
+      f.close()
+      for line in content:
+	
+	if not line:
+	  continue
+	if line.split()[0] == self.name.lower():
+	  rescaledVolume = float(line.split()[1])
+      
+    if not rescaledVolume == 0:
+      if abs(self.volume-rescaledVolume)/rescaledVolume > 0.1:
+	self.y = np.array(self.y)*self.volume/rescaledVolume
+	self.volume = rescaledVolume
+      #patientOarVolumes=np.zeros(len(names))
+      #if patientFlag==2:
+        #patientOarVolumes=[54,878,58,0,1.8,210,0,0,2725,2876,805]
+      #elif patientFlag==4:
+	#patientOarVolumes=[40.7,337.7,66.4,0,2.21,300.0,0,2828.1,1266,1552,1208,0,140,0,8.8,0]
+      #elif patientFlag==5:
+	#patientOarVolumes=[60,499,35,0,0.8,185,0,0,792,1071,0]
+      #elif patientFlag==6:
+	#patientOarVolumes=[26.4,686,35.3,0,5,209,0,0,2479,2654,0,0,0,42,22,5.5,0]
+      #elif patientFlag==12:
+	#patientOarVolumes=[27.3,551.8,40.8,0,1.56,283.1,0,0,1781,1456,0,124.5,0,40.2,0,0,0]
+      #elif patientFlag==15:
+	#patientOarVolumes=[24.5,0,41.2,0,0,64.6,0,0,1968,1812,0,3,0,37.1,0]
+      #elif patientFlag==16:
+	#patientOarVolumes=[36.6,386,35.6,0,0,276,0,2113,895,1211,0,0,198,22.2,11.2,0]
+	
+      #if index < len(patientOarVolumes):
+	#rescaledVolume = patientOarVolumes[index]
+      #else:
+	#rescaledVolume = 0
+      
+      

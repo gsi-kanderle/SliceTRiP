@@ -1,0 +1,120 @@
+import os
+import unittest
+from __main__ import vtk, qt, ctk, slicer
+import pytrip
+import numpy as np   
+
+import SaveTRiPLib
+
+class ConvertNodeLogic(object):
+  #Translate slicer data into TRiP cube data
+  
+  def __init__(self):
+    self.process = None
+  
+  def getPyTRiPCubeFromNode(self,node):
+    # Set pytrip cube
+    if node is None:
+      print "Error, no input node"
+      return None
+    
+    #if not node.IsA('vtkMRMLVectorVolumeNode') or node.IsA('vtkMRMLScalarVolumeNode'):
+      #raise "Can export only Scalar and Vector Volumes"
+      
+    cube = pytrip.cube.Cube()
+    array = slicer.util.array(node.GetID())
+    # Get dimensions and spacing and set it into header
+    dim = node.GetImageData().GetDimensions()
+    spacing = node.GetSpacing()
+    origin = node.GetOrigin()
+    
+    cube.create_empty_cube(0,dim[0],dim[1],dim[2],spacing[0],spacing[2])
+
+    cube.patient_name = node.GetName()
+    cube.xoffset = origin[0]
+    cube.yoffset = origin[1]
+    cube.zoffset = origin[2]
+    cube.slice_pos = []
+    cube.z_table = False 
+        
+    #TODO: Make a 3D cube in pytrip
+    
+    if node.IsA('vtkMRMLVectorVolumeNode'):
+      cube.cube[:] = array[:,:,:,0]#[:,::-1,::-1,0]
+    else:
+      if node.GetLabelMap():
+	print "Converting label map to int32.."
+	array = array.astype(np.int32)
+	maximum = array.max()
+	if not maximum == 0:
+	  cube.cube = np.array(array)/maximum
+	else:
+	#TODO: Tuki mors en error dat, al pa voi vn fuknt.
+	  print "Maximum value is 0"
+      else:
+        cube.cube[:] = array[:]#[:,::-1,::-1]
+        
+    if array.dtype == np.float32:
+      cube.set_data_type(np.float)
+      cube.pydata_type=np.float32
+    else:
+      if array.dtype == np.int32:
+	cube.set_data_type(np.int32)
+        cube.pydata_type=np.int32
+      else:
+        cube.set_data_type(array.dtype)
+        cube.pydata_type=array.dtype      
+    return cube
+
+  #Function for writing pytrip cube or slicer node into file. Filepath is a path to directory.
+  def writeTRiPdata(self, filePath, pytripCube=None, extension='.ctx', node = None, binfoName=''):
+    print "Mwahaaha."
+    if pytripCube is None and node is not None:
+      print "Converting slicer node into pytrip cube"
+      pytripCube = self.getPyTRiPCubeFromNode(node)
+    if pytripCube is None and node is None:
+      print "Input slicer node or pytrip Cube!"
+      return
+      
+    fName = str(filePath)+"/"+binfoName+ pytripCube.patient_name
+    if node is not None:
+      if node.IsA('vtkMRMLVectorVolumeNode'):
+        if not extension == '.cbt':
+	  print "Error, vector volume can be exported only as .cbt (no: "+extension+" )"
+	  return
+        array = slicer.util.array(node.GetID())
+        if pytripCube.byte_order == 'aix':
+	  print "Changing array to aix byte order."
+	  array.byteswap()
+	pName = pytripCube.patient_name
+        for i in range(0,3):
+	  # Vector field components in cbt are divided with voxel spacing due to historical reasons.
+	  if i == 2:
+	    print "Converting vector components."
+	    pytripCube.cube = np.array(array[:,:,:,i]/pytripCube.slice_distance
+	  else:
+	    pytripCube.cube = np.array(array[:,:,:,i]/pytripCube.pixel_size
+	  #pytripCube.cube = array
+	  if i==0:
+	    fNameNew = fName + "_x"
+	    pytripCube.patient_name = pName + "_x"
+	  elif i==1:
+	    fNameNew = fName + "_y"
+	    pytripCube.patient_name = pName + "_y"
+	  elif i==2:
+	    fNameNew = fName + "_z"
+	    pytripCube.patient_name = pName + "_z"
+	  print("Saving: "+fNameNew)
+	  pytripCube.write_trip_data(fNameNew+extension)
+          pytripCube.write_trip_header(fNameNew+".hed")
+      elif node.IsA('vtkMRMLScalarVolumeNode'):
+	pytripCube.write_trip_data(fName+extension)
+        pytripCube.write_trip_header(fName+".hed")
+    else:
+      if extension == '.cbt':
+	print "Error, input is not vector volume for exporting cbt."
+	return
+      pytripCube.write_trip_data(fName+extension)
+      pytripCube.write_trip_header(fName+".hed")
+      
+    print("Saved: "+fName+extension)
