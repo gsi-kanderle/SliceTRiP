@@ -667,7 +667,7 @@ class Voi():
     if patientFlag:
       patientOarVolumes=np.zeros(len(names))
       if patientFlag==2:
-        patientOarVolumes=[54,878,58,0,1.8,210,0,0,2725,2876,805]
+        patientOarVolumes=[54,878,58,0,1.8,210,0,0,1362,1438,805]
       elif patientFlag==4:
 	patientOarVolumes=[40.7,337.7,66.4,0,2.21,300.0,0,2828.1,1266,1552,1208,0,140,0,8.8,0]
       elif patientFlag==5:

@@ -340,33 +340,6 @@ class TRiPDVHLogic:
   def __init__(self):
     pass
 
-  def hasImageData(self,volumeNode):
-    """This is a dummy logic method that 
-    returns true if the passed in volume
-    node has valid image data
-    """
-    if not volumeNode:
-      print('no volume node')
-      return False
-    if volumeNode.GetImageData() == None:
-      print('no image data')
-      return False
-    return True
-
-  def delayDisplay(self,message,msec=1000):
-    #
-    # logic version of delay display
-    #
-    print(message)
-    self.info = qt.QDialog()
-    self.infoLayout = qt.QVBoxLayout()
-    self.info.setLayout(self.infoLayout)
-    self.label = qt.QLabel(message,self.info)
-    self.infoLayout.addWidget(self.label)
-    qt.QTimer.singleShot(msec, self.info.close)
-    self.info.exec_()
-
-  
   def addChart(self,dvhs,selectedList):
     ln = slicer.util.getNode(pattern='vtkMRMLLayoutNode*')
     ln.SetViewArrangement(25)

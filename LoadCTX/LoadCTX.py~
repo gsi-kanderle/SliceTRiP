@@ -1,6 +1,6 @@
 import os, re
 import unittest
-from __main__ import vtk, qt, slicer
+from __main__ import vtk, qt, ctk, slicer
 import numpy as np
 import pytrip
 import time
@@ -675,6 +675,7 @@ class LoadCTXLogic:
     contourDisplayNode.SliceIntersectionVisibilityOn()
     contourDisplayNode.VisibilityOn()
     contourDisplayNode.SetBackfaceCulling(0)
+    contourDisplayNode.SetSliceIntersectionThickness(3)
     
     #CreateColors
     colorNode = slicer.util.getNode('vtkMRMLColorTableNodeLabels')

@@ -374,13 +374,15 @@ class ComparePatientsLogic:
     voiOrder = ["heart","spinalcord","smallerairways","esophagus","trachea",
                 "aorta","vesselslarge","airwayslarge","brachialplexus","carina",
                 "ivc","largebronchus","svc","liver","lungl","lungr"]
+    voiOrder = ["ctv"]
+    metric = "d99"
     
     output_str = 'Difference in ' + metric + '\n'
     output_str += 'Patient name\t'
     for voi in voiOrder:
       output_str += voi + '\t'
     planPTV=False
-    norm = True
+    norm = False
     output_str += '\n'
     maxLungDose = 0
     #Flag for following ipsilateral lungl
@@ -399,7 +401,7 @@ class ComparePatientsLogic:
 	    if norm:
 	      if metric == 'maxDose':
 		normFactor = voi.maxPerscDose
-	      elif metric == 'calcDose':
+	      elif metric == 'calcPerscDose':
 		normFactor = voi.perscDose
 	      else:
 		normFactor = 1	      
@@ -424,9 +426,6 @@ class ComparePatientsLogic:
 		else:
 		  voiContraLateral = voi
 	      if voiIpsiLateral and voiContraLateral:
-		if norm:
-		  if metric == 'maxDose':
-		    normFactor = 24
 	        output_str += str(getattr(voiIpsiLateral,metric)/normFactor) +'\t'
 	        output_str += str(getattr(voiContraLateral,metric)/normFactor) +'\t'
 	        voiIpsiLateral = None

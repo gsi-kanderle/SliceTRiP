@@ -200,9 +200,9 @@ class LoadCTXWidget:
       if fileExtension == ".ctx":
 	reload(LoadCTXLib)
 	fileInfo = 0
-	if not self.ctx:
-	  self.ctx = logic.loadCube(filePath,fileInfo)
-	LoadCTXLib.addSeriesInHierarchy(self.ctx)
+	#if not self.ctx:
+	self.ctx = logic.loadCube(filePath,fileInfo)
+	#LoadCTXLib.addSeriesInHierarchy(self.ctx)
       elif fileExtension == ".dos":
 	fileInfo = 1
 	#if filePrefix.find('phys')>-1:
@@ -675,6 +675,7 @@ class LoadCTXLogic:
     contourDisplayNode.SliceIntersectionVisibilityOn()
     contourDisplayNode.VisibilityOn()
     contourDisplayNode.SetBackfaceCulling(0)
+    contourDisplayNode.SetSliceIntersectionThickness(3)
     
     #CreateColors
     colorNode = slicer.util.getNode('vtkMRMLColorTableNodeLabels')

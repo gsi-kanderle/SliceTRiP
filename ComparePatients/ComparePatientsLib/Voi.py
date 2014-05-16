@@ -274,6 +274,8 @@ class Voi():
       
   def setName(self,name):
     if name.find('PA') > -1 or name.find('Pulmonary') > -1:
-      self.name = 'vesselslarge'
+      name = 'vesselslarge'
     if name.find('.'):
-      self.name = name.replace(".","")
+      name = name.replace(".","")
+    name = name.lower()
+    self.name = name

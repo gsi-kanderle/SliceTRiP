@@ -242,7 +242,6 @@ class Voi():
       content = f.read().split('\n')
       f.close()
       for line in content:
-	
 	if not line:
 	  continue
 	if line.split()[0] == self.name.lower():
@@ -275,6 +274,7 @@ class Voi():
       
   def setName(self,name):
     if name.find('PA') > -1 or name.find('Pulmonary') > -1:
-      self.name = 'vesselslarge'
+      name = 'vesselslarge'
     if name.find('.'):
-      self.name = name.replace(".","")
+      name = name.replace(".","")
+    name = name.lower()
