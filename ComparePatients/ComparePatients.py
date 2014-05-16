@@ -199,7 +199,7 @@ class ComparePatientsWidget:
     #patient = self.getCurrentPatient()
     #selectedPlan = self.getCurrentPlan()
     logic = ComparePatientsLogic()
-    logic.exportMetricToClipboard(self.patientList,metric)
+    logic.exportMetricToClipboard(self.patientList,metric,planPTV = True)
     
   def onCompareButton(self):
     metric = self.metricComboBox.currentText
@@ -370,9 +370,9 @@ class ComparePatientsLogic:
   
   
   
-  def exportMetricToClipboard(self,patientList,metric):
+  def exportMetricToClipboard(self,patientList,metric,planPTV=False):
     voiOrder = ["heart","spinalcord","smallerairways","esophagus","trachea",
-                "aorta","vesselslarge","airwayslarge","bracialplexus","carina",
+                "aorta","vesselslarge","airwayslarge","brachialplexus","carina",
                 "ivc","largebronchus","svc","liver","lungl","lungr"]
     
     output_str = 'Difference in ' + metric + '\n'
@@ -390,14 +390,15 @@ class ComparePatientsLogic:
     for i in range(0,len(patientList)):
       newPatient = patientList[i]
       Patients.readPatientData(newPatient)
-      if Patients.compareToSbrt(newPatient,voiOrder):
+      if Patients.compareToSbrt(newPatient,voiOrder,planPTV):
 	output_str += newPatient.name + '\t'
 	for voiName in voiOrder:
 	  voi = newPatient.get_voiDifference_by_name(voiName)
 	  if voi:
-	    if voi.perscDose == 0:
-	      output_str += '\t'
-	      continue
+	    #if voi.perscDose == 0:
+	      #output_str += '\t'
+	      #continue
+	    voi.perscDose = 1
 	    if voiName.find('lung') > -1:
 	      if voiName == 'lungl':
 	        if not voi.ipsiLateral:

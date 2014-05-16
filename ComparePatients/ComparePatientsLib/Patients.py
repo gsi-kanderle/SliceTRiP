@@ -10,12 +10,16 @@ import Voi
 
 
 # Function that compares bestPlan to sbrt plan   
-def compareToSbrt(patient,voiList=[]):
+def compareToSbrt(patient,voiList=[],planPTV = False):
   if patient.voiDifferences:
     print patient.name + " already has voi Differences."
     return True
   
+  if planPTV:
+    patient.loadPTVPlan()
+    
   if not patient.bestPlan:
+    print "what I'm i doing here"
     patient.loadBestPlan()
     if not patient.bestPlan:
       print "No best plan."
@@ -24,6 +28,9 @@ def compareToSbrt(patient,voiList=[]):
   sbrtPlan = None
   for plan in patient.plans:
     if plan.sbrt:
+      if patient.name = 'Lung021':
+	if plan.fileName.find('_L') > -1 or plan.fileName.find('_R') > -1: 
+	  continue
       sbrtPlan = plan
       
   if not sbrtPlan:
@@ -31,6 +38,7 @@ def compareToSbrt(patient,voiList=[]):
     return False
   
   findIpsiLateralLung(sbrtPlan)
+  print patient.bestPlan.fileName
   
   if not voiList == []:
     for voi in voiList:
@@ -171,6 +179,11 @@ class Patient():
         return names
         
   
+  def loadPTVPlan(self):
+    for plan in self.plans:
+      if not plan.sbrt and plan.targetPTV:
+	self.bestPlan = plan
+    
   def loadBestPlan(self):
     filePath = self.infoFilePath
     if not os.path.isfile(filePath):
@@ -403,7 +416,7 @@ class Plan():
     dose = self.optDose
     output_str = 'Name\tMean Dose\tV10%\tV30%\tV99%\tV(onDose)\tMax Point Dose\tVolume (mm3) \n'
     voiOrder = ["heart","spinalcord","smallerairways","esophagus","trachea",
-                "aorta","vesselslarge","airwayslarge","bracialplexus","carina",
+                "aorta","vesselslarge","airwayslarge","brachialplexus","carina",
                 "ivc","largebronchus","svc","liver","lungl","lungr"]
 
     for nameit in voiOrder:

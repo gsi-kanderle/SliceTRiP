@@ -54,6 +54,7 @@ class Voi():
       difference = self.getDifferenceForMethodName(name,voi1,voi2)
       setattr(self, name, difference)
     
+    self.setOarConstraints()
     if voi1.ipsiLateral or voi2.ipsiLateral:
       self.ipsiLateral = True
     

@@ -372,7 +372,7 @@ class ComparePatientsLogic:
   
   def exportMetricToClipboard(self,patientList,metric):
     voiOrder = ["heart","spinalcord","smallerairways","esophagus","trachea",
-                "aorta","vesselslarge","airwayslarge","bracialplexus","carina",
+                "aorta","vesselslarge","airwayslarge","brachialplexus","carina",
                 "ivc","largebronchus","svc","liver","lungl","lungr"]
     
     output_str = 'Difference in ' + metric + '\n'
@@ -395,9 +395,10 @@ class ComparePatientsLogic:
 	for voiName in voiOrder:
 	  voi = newPatient.get_voiDifference_by_name(voiName)
 	  if voi:
-	    if voi.maxPerscDose == 0:
-	      output_str += '\t'
-	      continue
+	    #if voi.perscDose == 0:
+	      #output_str += '\t'
+	      #continue
+	    voi.perscDose = 1
 	    if voiName.find('lung') > -1:
 	      if voiName == 'lungl':
 	        if not voi.ipsiLateral:
@@ -415,13 +416,13 @@ class ComparePatientsLogic:
 		else:
 		  voiContraLateral = voi
 	      if voiIpsiLateral and voiContraLateral:
-	        output_str += str(getattr(voiIpsiLateral,metric)/voiIpsiLateral.maxPerscDose) +'\t'
-	        output_str += str(getattr(voiContraLateral,metric)/voiContraLateral.maxPerscDose) +'\t'
+	        output_str += str(getattr(voiIpsiLateral,metric)/voiIpsiLateral.perscDose) +'\t'
+	        output_str += str(getattr(voiContraLateral,metric)/voiContraLateral.perscDose) +'\t'
 	        voiIpsiLateral = None
 	        voiContraLateral = None
 	        firstLung = False
 	    else:
-	      output_str += str(getattr(voi,metric)/voi.maxPerscDose) +'\t'
+	      output_str += str(getattr(voi,metric)/voi.perscDose) +'\t'
 	  else:
 	    output_str += '\t'
 	output_str += '\n'

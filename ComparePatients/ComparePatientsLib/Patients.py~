@@ -10,12 +10,16 @@ import Voi
 
 
 # Function that compares bestPlan to sbrt plan   
-def compareToSbrt(patient,voiList=[]):
+def compareToSbrt(patient,voiList=[],planPTV = False):
   if patient.voiDifferences:
     print patient.name + " already has voi Differences."
     return True
   
+  if planPTV:
+    patient.loadPTVPlan()
+    
   if not patient.bestPlan:
+    print "what I'm i doing here"
     patient.loadBestPlan()
     if not patient.bestPlan:
       print "No best plan."
@@ -31,6 +35,7 @@ def compareToSbrt(patient,voiList=[]):
     return False
   
   findIpsiLateralLung(sbrtPlan)
+  print patient.bestPlan.fileName
   
   if not voiList == []:
     for voi in voiList:
@@ -108,6 +113,14 @@ def readPatientData(newPatient):
 	    else:
 	      print "Find new best plan for: " + newPatient.name
 	      newPatient.bestPlan = None
+        if filePrefix.find('sbrt') > -1:
+	  newPlan = Plan()
+	  newPlan.patientFlag = newPatient.number
+	  newPlan.fileName = fileName
+	  newPlan.readGDFile(filePathGD + fileName)
+	  newPlan.sbrt = True
+	  newPlan.targetPTV = True
+	  newPatient.add_plan(newPlan)
       if fileExtension == '.txt':
 	if filePrefix.find('sbrt') > -1:
 	  if filePrefix.find('dvh') > -1:
@@ -163,6 +176,11 @@ class Patient():
         return names
         
   
+  def loadPTVPlan(self):
+    for plan in self.plans:
+      if not plan.sbrt and plan.targetPTV:
+	self.bestPlan = plan
+    
   def loadBestPlan(self):
     filePath = self.infoFilePath
     if not os.path.isfile(filePath):
@@ -395,7 +413,7 @@ class Plan():
     dose = self.optDose
     output_str = 'Name\tMean Dose\tV10%\tV30%\tV99%\tV(onDose)\tMax Point Dose\tVolume (mm3) \n'
     voiOrder = ["heart","spinalcord","smallerairways","esophagus","trachea",
-                "aorta","vesselslarge","airwayslarge","bracialplexus","carina",
+                "aorta","vesselslarge","airwayslarge","brachialplexus","carina",
                 "ivc","largebronchus","svc","liver","lungl","lungr"]
 
     for nameit in voiOrder:
