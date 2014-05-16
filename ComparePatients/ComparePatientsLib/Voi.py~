@@ -28,6 +28,7 @@ class Voi():
     self.rescaledVolume = 0
     self.calcPerscDose = 0
     self.overOarDose = False
+    self.ipsiLateral = False
    
   
   def readTxtDvhFile(self, content, i):
@@ -52,6 +53,9 @@ class Voi():
     for name in namesList:
       difference = self.getDifferenceForMethodName(name,voi1,voi2)
       setattr(self, name, difference)
+    
+    if voi1.ipsiLateral or voi2.ipsiLateral:
+      self.ipsiLateral = True
     
 
   def getDifferenceForMethodName(self,name,voi1,voi2):
@@ -213,7 +217,6 @@ class Voi():
     
     if not self.maxPerscDose == 0 and self.maxDose > self.maxPerscDose:
       self.overOarDose = True
-      print "Maximum dose too high: " + names[index]
     
     # Some VOI volumes differ in 4D CT and Planning CT (i.e. if it has less slices). So this flag is used for comparing VOI volumes.
     # First you specified for which patient you want to check, then you input all volumes.

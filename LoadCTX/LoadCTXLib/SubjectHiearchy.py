@@ -1,7 +1,7 @@
 from __main__ import slicer
 
 
-def addSeriesInHierarchy(volumeNode):
+def addSeriesInHierarchy(volumeNodeID):
     tags = {}
     tags['seriesInstanceUID'] = "0020,000E"
     tags['seriesDescription'] = "0008,103E"
@@ -25,6 +25,7 @@ def addSeriesInHierarchy(volumeNode):
       sys.stderr.write('Unable to create SubjectHierarchy nodes: SubjectHierarchy module not found!')
       return
 
+    volumeNode = slicer.util.getNode(volumeNodeID)
     #firstFile = loadable.files[0]
 
     #seriesInstanceUid = slicer.dicomDatabase.fileValue(firstFile,tags['seriesInstanceUID'])
@@ -65,7 +66,7 @@ def addSeriesInHierarchy(volumeNode):
     #patientId = slicer.dicomDatabase.fileValue(firstFile,tags['patientID'])
     patientId = 'Test'
     patientNode = vtkMRMLSubjectHierarchyNode.GetSubjectHierarchyNodeByUID(slicer.mrmlScene, 'DICOM', patientId)
-    studyInstanceUid = seriesInstanceUID
+    studyInstanceUid = seriesInstanceUid
     studyNode = vtkMRMLSubjectHierarchyNode.GetSubjectHierarchyNodeByUID(slicer.mrmlScene, 'DICOM', studyInstanceUid)
     vtkSlicerSubjectHierarchyModuleLogic.InsertDicomSeriesInHierarchy(slicer.mrmlScene, patientId, studyInstanceUid, seriesInstanceUid)
 

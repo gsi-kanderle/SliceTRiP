@@ -28,6 +28,7 @@ class Voi():
     self.rescaledVolume = 0
     self.calcPerscDose = 0
     self.overOarDose = False
+    self.ipsiLateral = False
    
   
   def readTxtDvhFile(self, content, i):
@@ -52,6 +53,10 @@ class Voi():
     for name in namesList:
       difference = self.getDifferenceForMethodName(name,voi1,voi2)
       setattr(self, name, difference)
+    
+    self.setOarConstraints()
+    if voi1.ipsiLateral or voi2.ipsiLateral:
+      self.ipsiLateral = True
     
 
   def getDifferenceForMethodName(self,name,voi1,voi2):

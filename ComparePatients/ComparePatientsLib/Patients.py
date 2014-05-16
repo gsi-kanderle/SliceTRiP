@@ -29,7 +29,9 @@ def compareToSbrt(patient,voiList=[]):
   if not sbrtPlan:
     print "No sbrt plan"
     return False
-    
+  
+  findIpsiLateralLung(sbrtPlan)
+  
   if not voiList == []:
     for voi in voiList:
       voiSbrt = sbrtPlan.get_voi_by_name(voi)
@@ -49,7 +51,24 @@ def compareToSbrt(patient,voiList=[]):
         patient.voiDifferences.append(v)
       else:
         print voiSbrt.name + " no instance in PT plan"
+        
   return True
+        
+#Find out ipsi and contralateral lung, just by checking if the dose is higher than 20 Gy.
+def findIpsiLateralLung(plan):
+  voiLungL = plan.get_voi_by_name('lungl')
+  voiLungR = plan.get_voi_by_name('lungr')
+  if not voiLungL and not voiLungR:
+    print "Cannot find lung voi"
+    return
+  if voiLungL.maxDose > 20:
+    voiLungL.ipsiLateral = True
+  elif voiLungR.maxDose > 20:
+    voiLungR.ipsiLateral = True
+  else:
+    print "No lung has dose higher than 20 Gy"
+
+  
 
 #Goes through directory and reads all data into newPatient
 def readPatientData(newPatient):
@@ -89,6 +108,14 @@ def readPatientData(newPatient):
 	    else:
 	      print "Find new best plan for: " + newPatient.name
 	      newPatient.bestPlan = None
+        if filePrefix.find('sbrt') > -1:
+	  newPlan = Plan()
+	  newPlan.patientFlag = newPatient.number
+	  newPlan.fileName = fileName
+	  newPlan.readGDFile(filePathGD + fileName)
+	  newPlan.sbrt = True
+	  newPlan.targetPTV = True
+	  newPatient.add_plan(newPlan)
       if fileExtension == '.txt':
 	if filePrefix.find('sbrt') > -1:
 	  if filePrefix.find('dvh') > -1:

@@ -261,8 +261,9 @@ class ComparePatientsWidget:
       print "Error, voi not found."
       return
     filePath = filePrefix + voi.name + ".ctx"
+    n=0 #motion state
     logic = LoadCTX.LoadCTXLogic()
-    voi.slicerNodeID[n]=logic.loadCube(filePath,2,motionState=0,voi=voi)
+    voi.slicerNodeID[n]=logic.loadCube(filePath,2,motionState=n,voi=voi)
   def onSaveBestPlanButton(self):
     reload(Patients)
     patient = self.getCurrentPatient()
@@ -380,6 +381,11 @@ class ComparePatientsLogic:
       output_str += voi + '\t'
     
     output_str += '\n'
+    maxLungDose = 0
+    #Flag for following ipsilateral lungl
+    firstLung = False
+    voiIpsiLateral = None
+    voiContraLateral = None
     print metric
     for i in range(0,len(patientList)):
       newPatient = patientList[i]
@@ -387,10 +393,35 @@ class ComparePatientsLogic:
       if Patients.compareToSbrt(newPatient,voiOrder):
 	output_str += newPatient.name + '\t'
 	for voiName in voiOrder:
-	  print voiName
 	  voi = newPatient.get_voiDifference_by_name(voiName)
 	  if voi:
-	    output_str += str(getattr(voi,metric)) +'\t'
+	    if voi.maxPerscDose == 0:
+	      output_str += '\t'
+	      continue
+	    if voiName.find('lung') > -1:
+	      if voiName == 'lungl':
+	        if not voi.ipsiLateral:
+	          voiContraLateral = voi
+	          firstLung = True
+	        else:
+		  voiIpsiLateral = voi
+	      elif voiName == 'lungr':
+	        if firstLung:
+		  if voi.ipsiLateral:
+		    voiIpsiLateral = voi
+		  else:
+		    print "No ipsi-lateral lung"
+		    output_str += '-1\t-1\t'
+		else:
+		  voiContraLateral = voi
+	      if voiIpsiLateral and voiContraLateral:
+	        output_str += str(getattr(voiIpsiLateral,metric)/voiIpsiLateral.maxPerscDose) +'\t'
+	        output_str += str(getattr(voiContraLateral,metric)/voiContraLateral.maxPerscDose) +'\t'
+	        voiIpsiLateral = None
+	        voiContraLateral = None
+	        firstLung = False
+	    else:
+	      output_str += str(getattr(voi,metric)/voi.maxPerscDose) +'\t'
 	  else:
 	    output_str += '\t'
 	output_str += '\n'
