@@ -95,7 +95,7 @@ class Voi():
       
     #self.name = string.join(line.split()[1:],' ')
     self.minDose = float(line.split()[2])*self.optDose
-    self.maxDose = round(float(line.pulmonaryvesselsplit()[3]),2)*self.optDose
+    self.maxDose = round(float(line.split()[3]),2)*self.optDose
     self.meanDose = float(line.split()[4])*self.optDose
     self.stdev = float(line.split()[5])*self.optDose
     self.mdian = float(line.split()[6])*self.optDose
@@ -272,7 +272,7 @@ class Voi():
 	#rescaledVolume = 0
       
   def setName(self,name):
-    if name.find('PA') > -1 or name.find('Pulmonaryvessel') or name.find('Pulmonaryartery'):
+    if name.find('PA') > -1 or name.find('Pulmonary') > -1:
       self.name = 'vesselslarge'
-    if name.find(.):
+    if name.find('.'):
       self.name = name.replace(".","")

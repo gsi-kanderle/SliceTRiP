@@ -379,14 +379,13 @@ class ComparePatientsLogic:
     output_str += 'Patient name\t'
     for voi in voiOrder:
       output_str += voi + '\t'
-    
+    planPTV=False
     output_str += '\n'
     maxLungDose = 0
     #Flag for following ipsilateral lungl
     firstLung = False
     voiIpsiLateral = None
     voiContraLateral = None
-    print metric
     for i in range(0,len(patientList)):
       newPatient = patientList[i]
       Patients.readPatientData(newPatient)

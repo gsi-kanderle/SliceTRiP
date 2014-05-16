@@ -19,16 +19,16 @@ def compareToSbrt(patient,voiList=[],planPTV = False):
     patient.loadPTVPlan()
     
   if not patient.bestPlan:
-    print "what I'm i doing here"
     patient.loadBestPlan()
     if not patient.bestPlan:
-      print "No best plan."
       return False
+  
+  print patient.name + " has best plan: " + patient.bestPlan.fileName
   
   sbrtPlan = None
   for plan in patient.plans:
     if plan.sbrt:
-      if patient.name = 'Lung021':
+      if patient.name == 'Lung021':
 	if plan.fileName.find('_L') > -1 or plan.fileName.find('_R') > -1: 
 	  continue
       sbrtPlan = plan
@@ -44,12 +44,14 @@ def compareToSbrt(patient,voiList=[],planPTV = False):
     for voi in voiList:
       voiSbrt = sbrtPlan.get_voi_by_name(voi)
       voiPlan = patient.bestPlan.get_voi_by_name(voi)
-      if voiPlan and voiSbrt:
-	v = Voi.Voi(voi)
-	v.createVoiDifference(voiSbrt,voiPlan)
-	patient.voiDifferences.append(v)
-      else:
-	print "No voi: " + voi
+      if voiSbrt:
+	#If there's no VOI in plan it has dose 0.
+	if voiPlan:
+	  v = Voi.Voi(voi)
+	  v.createVoiDifference(voiSbrt,voiPlan)
+	  patient.voiDifferences.append(v)
+	else:
+	  patient.voiDifferences.append(voiSbrt)
   else:
     for voiSbrt in sbrtPlan.vois:
       voiPlan = patient.bestPlan.get_voi_by_name(voiSbrt.name)
@@ -103,6 +105,8 @@ def readPatientData(newPatient):
 	  newPlan.fileName = fileName
 	  #Get info from filename
 	  newPlan.readGDFileName(filePrefix)
+	  #Add manual optDose = 25, because plan / dose(25) is set in all 4D calc (even if name says d26.5)
+	  newPlan.optDose = 25
 	  # Read dvh and add vois
 	  newPlan.patientFlag = newPatient.number
 	  newPlan.readGDFile(filePathGD + fileName)
@@ -114,12 +118,13 @@ def readPatientData(newPatient):
 	    if newPlan.targetPTV:
 	      pass
 	    else:
-	      print "Find new best plan for: " + newPatient.name
 	      newPatient.bestPlan = None
         if filePrefix.find('sbrt') > -1:
 	  newPlan = Plan()
 	  newPlan.patientFlag = newPatient.number
 	  newPlan.fileName = fileName
+	  #Manual input, because it can't read it from fileName
+	  newPlan.optDose = 25
 	  newPlan.readGDFile(filePathGD + fileName)
 	  newPlan.sbrt = True
 	  newPlan.targetPTV = True
@@ -194,12 +199,10 @@ class Patient():
     f.close()
     for column in content:
       if column.find('BestPlan') > -1:
-	print "Found plan"
 	fileName = column.split()[1]
     
     for plan in self.plans:
       if plan.fileName == fileName:
-	print "Found Best Plan."
 	self.bestPlan = plan
 	
     if not self.bestPlan:
@@ -272,7 +275,6 @@ class Plan():
                 return voi
             if voi.name.find(name) > -1:
 	      return voi
-        print("Voi doesn't exist")
 
 
   def readTxtDvhFile(self,filePath):
