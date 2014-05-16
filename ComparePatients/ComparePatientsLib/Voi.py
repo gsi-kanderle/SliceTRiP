@@ -197,7 +197,7 @@ class Voi():
       index = names.index(self.name.lower())
     else:
       return
-           
+    
     perscVolume=[0.35,15,5,10,0.5,
              10,4,1500,1500,1500,
              700,3,10,4,4,
@@ -208,9 +208,11 @@ class Voi():
                9.1,14,31,10.5,10.5,
                10.5,31,31,12.4,31,
                12.4]
+     #For lungs and liver max dose is "24 Gy" for normalization purposes only          
+    norm = 24
     maxPerscDose=[14,22,15.4,12.4,13.3,
-              37,20.2,0,0,0,
-              0,17.5,37,20.2,20.2,
+              37,20.2,norm,norm,norm,
+              norm,17.5,37,20.2,20.2,
               20.2,37,37,13.3,37,
               13.3]
     self.perscDose = perscDose[index]
@@ -240,7 +242,6 @@ class Voi():
       content = f.read().split('\n')
       f.close()
       for line in content:
-	
 	if not line:
 	  continue
 	if line.split()[0] == self.name.lower():

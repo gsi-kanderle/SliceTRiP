@@ -380,13 +380,13 @@ class ComparePatientsLogic:
     for voi in voiOrder:
       output_str += voi + '\t'
     planPTV=False
+    norm = True
     output_str += '\n'
     maxLungDose = 0
     #Flag for following ipsilateral lungl
     firstLung = False
     voiIpsiLateral = None
     voiContraLateral = None
-    print metric
     for i in range(0,len(patientList)):
       newPatient = patientList[i]
       Patients.readPatientData(newPatient)
@@ -395,10 +395,18 @@ class ComparePatientsLogic:
 	for voiName in voiOrder:
 	  voi = newPatient.get_voiDifference_by_name(voiName)
 	  if voi:
-	    #if voi.perscDose == 0:
-	      #output_str += '\t'
-	      #continue
-	    voi.perscDose = 1
+	    #Normalization factor
+	    if norm:
+	      if metric == 'maxDose':
+		normFactor = voi.maxPerscDose
+	      elif metric == 'calcDose':
+		normFactor = voi.perscDose
+	      else:
+		normFactor = 1	      
+	    if normFactor == 0:
+	      output_str += '\t'
+	      continue
+
 	    if voiName.find('lung') > -1:
 	      if voiName == 'lungl':
 	        if not voi.ipsiLateral:
@@ -416,13 +424,16 @@ class ComparePatientsLogic:
 		else:
 		  voiContraLateral = voi
 	      if voiIpsiLateral and voiContraLateral:
-	        output_str += str(getattr(voiIpsiLateral,metric)/voiIpsiLateral.perscDose) +'\t'
-	        output_str += str(getattr(voiContraLateral,metric)/voiContraLateral.perscDose) +'\t'
+		if norm:
+		  if metric == 'maxDose':
+		    normFactor = 24
+	        output_str += str(getattr(voiIpsiLateral,metric)/normFactor) +'\t'
+	        output_str += str(getattr(voiContraLateral,metric)/normFactor) +'\t'
 	        voiIpsiLateral = None
 	        voiContraLateral = None
 	        firstLung = False
 	    else:
-	      output_str += str(getattr(voi,metric)/voi.perscDose) +'\t'
+	      output_str += str(getattr(voi,metric)/normFactor) +'\t'
 	  else:
 	    output_str += '\t'
 	output_str += '\n'
