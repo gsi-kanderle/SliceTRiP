@@ -205,8 +205,9 @@ class ComparePatientsWidget:
     metric = self.metricComboBox.currentText
     patient = self.getCurrentPatient()
     selectedPlan = self.getCurrentPlan()
-    logic = ComparePatientsLogic()
-    logic.visualizeComparison(patient,selectedPlan,metric)
+    selectedPlan.setTable(self.parametersFormLayout)
+    #logic = ComparePatientsLogic()
+    #logic.visualizeComparison(patient,selectedPlan,metric)
     
     
   def onShowPlanButton(self):
@@ -374,15 +375,17 @@ class ComparePatientsLogic:
     voiOrder = ["heart","spinalcord","smallerairways","esophagus","trachea",
                 "aorta","vesselslarge","airwayslarge","brachialplexus","carina",
                 "ivc","largebronchus","svc","liver","lungl","lungr"]
-    voiOrder = ["ctv"]
-    metric = "d99"
-    
+    #voiOrder = ["ctv"]
+    #metric = "d99"
+    #File path for pps file:
+    ppsFilePath = '/u/kanderle/AIXd/Data/FC/planpars/'
     output_str = 'Difference in ' + metric + '\n'
     output_str += 'Patient name\t'
     for voi in voiOrder:
       output_str += voi + '\t'
-    planPTV=False
-    norm = False
+    planPTV=True
+    normOn = False
+    ctvOn = True
     output_str += '\n'
     maxLungDose = 0
     #Flag for following ipsilateral lungl
@@ -391,14 +394,23 @@ class ComparePatientsLogic:
     voiContraLateral = None
     for i in range(0,len(patientList)):
       newPatient = patientList[i]
-      Patients.readPatientData(newPatient)
+      Patients.readPatientData(newPatient,planPTV)
+      #Find out target names from pps files
+      ppsFile = ppsFilePath + newPatient.name + '.pps'
+      if os.path.isfile(ppsFile):
+	targets = self.readTargetsFromPps(ppsFile)
+
+
+      #Create voi difference for each patient - difference between best plan and sbrt
+      #print voiOrder
       if Patients.compareToSbrt(newPatient,voiOrder,planPTV):
 	output_str += newPatient.name + '\t'
 	for voiName in voiOrder:
 	  voi = newPatient.get_voiDifference_by_name(voiName)
 	  if voi:
 	    #Normalization factor
-	    if norm:
+	    normFactor = 1
+	    if normOn:
 	      if metric == 'maxDose':
 		normFactor = voi.maxPerscDose
 	      elif metric == 'calcPerscDose':
@@ -408,7 +420,6 @@ class ComparePatientsLogic:
 	    if normFactor == 0:
 	      output_str += '\t'
 	      continue
-
 	    if voiName.find('lung') > -1:
 	      if voiName == 'lungl':
 	        if not voi.ipsiLateral:
@@ -435,7 +446,17 @@ class ComparePatientsLogic:
 	      output_str += str(getattr(voi,metric)/normFactor) +'\t'
 	  else:
 	    output_str += '\t'
+	if targets:
+	  Patients.compareToSbrt(newPatient,targets,planPTV)
+	  metricD99 = 'd99'
+	  for targetStr in targets:
+	    if targetStr:
+	      target = newPatient.bestPlan.get_voi_by_name(targetStr)
+	      if target:
+		print "Found target: " + targetStr
+	        output_str += str(getattr(target,metricD99)) +'\t'
 	output_str += '\n'
+	
       else:
 	print "Not enough data."
 
@@ -476,30 +497,49 @@ class ComparePatientsLogic:
     #cn.SetProperty('default', 'xAxisType', 'categorical')
     cn.SetProperty('default', 'yAxisLabel', 'Dose Difference [Gy]')
     cn.SetProperty('default', 'type', 'Bar')
-    cn.SetProperty('Volumes', 'lookupTable', slicer.util.getNode('GenericAnatomyColors').GetID() )
+    #cn.SetProperty('Volumes', 'lookupTable', slicer.util.getNode('GenericAnatomyColors').GetID() )
     cvn.SetChartNodeID(cn.GetID())
     print "Finished!"
     
   
   def loadPlan(self,patient,plan):
     import LoadCTX
+    import LoadCTXLib
+    
     loadLogic = LoadCTX.LoadCTXLogic()
-    filePathCT = ('/u/kanderle/AIXd/Data/FC/' + patient.name + '/CTX/'+patient.name+'_00.ctx')
-    filePathPlan = ('/u/kanderle/AIXd/Data/FC/' + patient.name + '/Dose/' + plan.fileName[0:-7] + '_bio.dos')
-    if not os.path.exists(filePathCT):
-      print "No CT at: " + filePathCT
-      return
-    if not os.path.exists(filePathPlan):
-      filePathPlan = ('/u/kanderle/AIXd/Data/FC/' + patient.name + '/Dose/' + plan.fileName[0:-7] + '_resample.dos')
+    if patient.slicerNodeID == '':
+      filePathCT = ('/u/kanderle/AIXd/Data/FC/' + patient.name + '/CTX/'+patient.name+'_00.ctx')
+      if not os.path.exists(filePathCT):
+	print "No CT at: " + filePathCT
+	return
+      patient.slicerNodeID = loadLogic.loadCube(filePathCT,0)
+    
+    if plan.slicerNodeID == '':
+      filePathPlan = ('/u/kanderle/AIXd/Data/FC/' + patient.name + '/Dose/' + plan.fileName[0:-7] + '_bio.dos')
       if not os.path.exists(filePathPlan):
-        print "No plan at: " + filePathPlan
-        return
-    #TODO: Check if slicerNodeID already exist and then load it.
-    patient.slicerNodeID = loadLogic.loadCube(filePathCT,0)
-    plan.slicerNodeID = loadLogic.loadCube(filePathPlan,1,optDose = 24)
+	filePathPlan = ('/u/kanderle/AIXd/Data/FC/' + patient.name + '/Dose/' + plan.fileName[0:-7] + '_resample.dos')
+	if not os.path.exists(filePathPlan):
+	  print "No plan at: " + filePathPlan
+	  return
+      plan.slicerNodeID = loadLogic.loadCube(filePathPlan,1,optDose = 24)
     
+    #LoadCTXLib.addSeriesInHierarchy(patient,plan)
     
-
+  def readTargetsFromPps(self,filePath):
+    fp = open(filePath,"r")
+    content = fp.read().split('\n')
+    fp.close()
+    targetList = []
+    for line in content:
+      if not line:
+	continue
+      if line.find('#') > -1:
+	continue
+      if line.find('PTV') > -1:
+	targetList.append(line.split()[2])
+      else:
+	targetList.append(line.split()[2])
+    return targetList
 
 class ComparePatientsTest(unittest.TestCase):
   """

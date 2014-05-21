@@ -11,19 +11,22 @@ import Voi
 
 # Function that compares bestPlan to sbrt plan   
 def compareToSbrt(patient,voiList=[],planPTV = False):
-  if patient.voiDifferences:
-    print patient.name + " already has voi Differences."
-    return True
+  #if patient.voiDifferences:
+    #print patient.name + " already has voi Differences."
+    #return True
   
   if planPTV:
     patient.loadPTVPlan()
     
-  if not patient.bestPlan:
+  if not patient.bestPlan and not planPTV:
     patient.loadBestPlan()
     if not patient.bestPlan:
       return False
   
-  print patient.name + " has best plan: " + patient.bestPlan.fileName
+  if not patient.bestPlan:
+    return False
+  else:
+    print patient.name + " has best plan: " + patient.bestPlan.fileName
   
   sbrtPlan = None
   for plan in patient.plans:
@@ -38,7 +41,6 @@ def compareToSbrt(patient,voiList=[],planPTV = False):
     return False
   
   findIpsiLateralLung(sbrtPlan)
-  print patient.bestPlan.fileName
   
   if not voiList == []:
     for voi in voiList:
@@ -81,7 +83,7 @@ def findIpsiLateralLung(plan):
   
 
 #Goes through directory and reads all data into newPatient
-def readPatientData(newPatient):
+def readPatientData(newPatient,planPTV=False):
   if not newPatient:
     print "Error, no newPatient!"
     
@@ -105,11 +107,13 @@ def readPatientData(newPatient):
 	  newPlan.fileName = fileName
 	  #Get info from filename
 	  newPlan.readGDFileName(filePrefix)
+	  #Add manual optDose = 25, because plan / dose(25) is set in all 4D calc (even if name says d26.5)
+	  newPlan.optDose = 25
 	  # Read dvh and add vois
 	  newPlan.patientFlag = newPatient.number
 	  newPlan.readGDFile(filePathGD + fileName)
 	  newPatient.add_plan(newPlan)
-	  if not newPatient.bestPlan:
+	  if not newPatient.bestPlan and not planPTV:
 	    if not newPlan.targetPTV:
 	      newPatient.bestPlan = newPlan
 	  else:
@@ -148,6 +152,7 @@ class Patient():
     self.plans = []
     self.voiDifferences = []
     self.slicerNodeID = ''
+    self.slicerSubjectNodeID = ''
     self.bestPlan = None
     self.infoFilePath = '/u/kanderle/AIXd/Data/FC/' + name + '/' + name + '_info.txt'
     self.slicerTable = None
@@ -256,7 +261,10 @@ class Plan():
     self.oarWeigth = 0
     self.patientFlag = 0
     self.vois = []
-    self.slicerNodeID = []
+    self.slicerNodeID = ''
+    self.voiTable = None
+    self.voiTableCheckBox = []
+    self.horizontalHeaders=['Show:',"Max(Gy)","D99%(Gy)","D10%(Gy)","D30(Gy)","per. Volume (Gy)","Volume(cc)"]
     
   def get_voi_names(self):
         names = []
@@ -431,4 +439,53 @@ class Plan():
 	    output_str += (voi.name+'\t'+'\t'+str(voi.calcPerscDose)+'\t'+str(voi.maximumDose)+'\t'+str(voi.volume) + ' \n')
 
       #output_str += (nameit+'\n')
-    return output_str     
+    return output_str
+  
+  def setTable(self,layout):
+    from __main__ import qt
+    # Voi Table
+    table = self.voiTable
+    if table:
+      table.clearContents()
+    else:
+      
+      
+      table= qt.QTableWidget()
+      layout.addRow(table)
+    #table.visible = False
+    
+    
+    table.setColumnCount(len(self.horizontalHeaders))
+    table.setHorizontalHeaderLabels(self.horizontalHeaders)
+    table.setEditTriggers(qt.QAbstractItemView.NoEditTriggers)
+
+    table.setRowCount(len(self.vois))
+    table.setVerticalHeaderLabels(self.get_voi_names())
+        
+    for i in range(0,len(self.vois)):
+      checkBox = qt.QCheckBox()
+      if checkBox:
+        self.voiTableCheckBox.append(checkBox)
+        table.setCellWidget(i,0,checkBox)
+      setVoiTable(table,self.vois[i],i)
+      
+      #self.voiComboBox.addItem(voi)
+    
+    table.visible = True
+    table.resizeColumnsToContents()
+    self.voiTable = table
+    
+ 
+    def setVoiTable(table,voi,n):
+      voi.setDvhTableItems(self.horizontalHeaders) 
+      a = [str(voi.maxDose)+"/"+str(voi.maxPerscDose),str(voi.d99),str(voi.d10),str(voi.d30),
+	    str(voi.calcPerscDose)+"/"+str(voi.perscDose),str(voi.volume)]
+      for i in range(1,len(self.horizontalHeaders)):
+	item = voi.dvhTableItems[i-1]
+	table.setItem(n,i,item)
+	if not len(a) == len(voi.dvhTableItems):
+	  print "Not enough table items, check code."
+	item.setText(a[i-1])
+	if voi.overOarDose:
+	  item.setBackground(qt.QColor().fromRgbF(1,0,0,1))
+      

@@ -279,3 +279,12 @@ class Voi():
       name = name.replace(".","")
     name = name.lower()
     self.name = name
+    
+  def setDvhTableItems(self,horizontalHeaders):
+    from __main__ import qt
+    
+    self.dvhTableItems=[]
+    for i in range(0,len(horizontalHeaders)-1):
+      item = qt.QTableWidgetItem()
+      self.dvhTableItems.append(item)
+    self.calculateDose()
