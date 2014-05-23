@@ -89,6 +89,22 @@ class CreateMovieWidget:
     parametersFormLayout = qt.QFormLayout(parametersCollapsibleButton)
 
     #
+    # input volume selector
+    #
+    self.inputSelector = slicer.qMRMLNodeComboBox()
+    self.inputSelector.nodeTypes = ( ("vtkMRMLScalarVolumeNode"), "" )
+    self.inputSelector.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
+    self.inputSelector.selectNodeUponCreation = True
+    self.inputSelector.addEnabled = False
+    self.inputSelector.removeEnabled = False
+    self.inputSelector.noneEnabled = False
+    self.inputSelector.showHidden = False
+    self.inputSelector.showChildNodeTypes = False
+    self.inputSelector.setMRMLScene( slicer.mrmlScene )
+    self.inputSelector.setToolTip( "Pick the input to the algorithm." )
+    parametersFormLayout.addRow("Input Volume: ", self.inputSelector)
+    
+    #
     # check box to trigger taking screen shots for later use in tutorials
     #
     self.enableScreenshotsFlagCheckBox = qt.QCheckBox()
@@ -129,7 +145,8 @@ class CreateMovieWidget:
     enableScreenshotsFlag = self.enableScreenshotsFlagCheckBox.checked
     screenshotScaleFactor = int(self.screenshotScaleFactorSliderWidget.value)
     print("Run the algorithm")
-    logic.run(enableScreenshotsFlag,screenshotScaleFactor)
+    name = self.inputSelector.currentNode().GetName()
+    logic.run(name,enableScreenshotsFlag,screenshotScaleFactor)
 
   def onReload(self,moduleName="CreateMovie"):
     """Generic reload method for any scripted module.
@@ -199,6 +216,7 @@ class CreateMovieLogic:
       return
 
     lm = slicer.app.layoutManager()
+    description = '4D'
     # switch on the type to get the requested window
     widget = 0
     if type == -1:
@@ -220,32 +238,46 @@ class CreateMovieLogic:
       # green slice window
       widget = lm.sliceWidget("Green")
 
-    degrees = 69
-    for i in range(0,degrees):
-      if i < 10:
-      number = '0' + str(i)
-      else:
-      number = str(i)
-      filePath = '/u/kanderle/Transfer/Movie/'+name+'_'+number+'.png'
-      rw = widget.renderWindow()
-      wti = vtk.vtkWindowToImageFilter()
-      wti.SetInput(rw)
-      wti.Update()
-      writer = vtk.vtkPNGWriter()
-      writer.SetFileName(filePath)
-      writer.SetInputConnection(wti.GetOutputPort())
-      writer.Write()
-      widget.yaw()
-      widget.forceRender()
+    # grab and convert to vtk image data
+    if type == slicer.qMRMLScreenShotDialog().ThreeD:
+      degrees = 69
+      for i in range(0,degrees):
+	if i < 10:
+	  number = '0' + str(i)
+	else:
+	  number = str(i)
+	filePath = '/u/kanderle/Transfer/Movie/'+name+'_'+number+'.png'
+	rw = widget.renderWindow()
+	wti = vtk.vtkWindowToImageFilter()
+	wti.SetInput(rw)
+	wti.Update()
+	writer = vtk.vtkPNGWriter()
+	writer.SetFileName(filePath)
+	writer.SetInputConnection(wti.GetOutputPort())
+	writer.Write()
+	widget.yaw()
+	widget.forceRender()
+    else:
+      qpixMap = qt.QPixmap().grabWidget(widget)
+      qimage = qpixMap.toImage()
+      imageData = vtk.vtkImageData()
+      slicer.qMRMLUtils().qImageToVtkImageData(qimage,imageData)
+
+      annotationLogic = slicer.modules.annotations.logic()
+      annotationLogic.CreateSnapShot(name, description, type, self.screenshotScaleFactor, imageData)
+    
+    
+    
     
 
-  def run(self,enableScreenshots=0,screenshotScaleFactor=1):
+  def run(self,node,enableScreenshots=0,screenshotScaleFactor=1):
     """
     Run the actual algorithm
     """
     self.enableScreenshots = enableScreenshots
     self.screenshotScaleFactor = screenshotScaleFactor
-    self.takeScreenshot('Lung001_PT',slicer.qMRMLScreenShotDialog().ThreeD)
+    #self.takeScreenshot('Lung001_PT',slicer.qMRMLScreenShotDialog().ThreeD)
+    self.takeScreenshot(name,slicer.qMRMLScreenShotDialog().Green)
 
     print "Finished!"
     return True
