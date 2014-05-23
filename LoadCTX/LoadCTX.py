@@ -2,7 +2,6 @@ import os, re
 import unittest
 from __main__ import vtk, qt, ctk, slicer
 import numpy as np
-import pytrip
 import time
 
 import LoadCTXLib
@@ -432,17 +431,17 @@ class LoadCTXLogic:
     
     #Read cube using PyTRiP
     if fileInfo==0 or fileInfo==2:
-      pyTRiPCube=pytrip.CtxCube()
+      pyTRiPCube=LoadCTXLib.ctx.CtxCube()
       pyTRiPCube.read(filePath)
     elif fileInfo==1:
-      pyTRiPCube=pytrip.DosCube()
+      pyTRiPCube=LoadCTXLib.ctx.CtxCube()
       pyTRiPCube.read(filePath)
     #Prepare three cubes for reading cbt files
     elif fileInfo==3:
       fileNamePrefix = fileName[0:len(fileName)-2]
-      pyTRiPCube = pytrip.CtxCube() #cube x is without index for setting dimension and name
-      pyTRiPCube_y = pytrip.CtxCube()
-      pyTRiPCube_z = pytrip.CtxCube()
+      pyTRiPCube = LoadCTXLib.ctx.CtxCube() #cube x is without index for setting dimension and name
+      pyTRiPCube_y = LoadCTXLib.ctx.CtxCube()
+      pyTRiPCube_z = LoadCTXLib.ctx.CtxCube()
       pyTRiPCube.read(fileNamePrefix+"_x"+fileExtension)
       pyTRiPCube_y.read(fileNamePrefix+"_y"+fileExtension)
       pyTRiPCube_z.read(fileNamePrefix+"_z"+fileExtension)
