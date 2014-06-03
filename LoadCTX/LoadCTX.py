@@ -24,6 +24,7 @@ class LoadCTX:
     parent.acknowledgementText = """
     This file was originally developed by Jean-Christophe Fillion-Robin, Kitware Inc. and Steve Pieper, Isomics, Inc.  and was partially funded by NIH grant 3P41RR013218-12S1.
 """ # replace with organization, grant and thanks.
+    #parent.icon = qt.QIcon(':Icons/XLarge/SlicerDownloadMRHead.png')
     self.parent = parent
     #reload(binfo)
 
@@ -565,15 +566,20 @@ class LoadCTXLogic:
     self.setSliceDisplay(slicerVolume,background)
         
          
+    
     #Set dose values to float for normalization and calculations
     if pyTRiPCube.data_type=='integer' and fileInfo == 1:
       cliNode = self.changeScalarVolumeType(slicerVolume)
 
-    if fileInfo is 1:
-      volumeArray = slicer.util.array(slicerVolume.GetID())
-      print "Normalizing dose volume " + str(optDose)
-      volumeArray[:] = volumeArray[:]*100/optDose
-      slicerVolume.GetImageData().Modified()
+    #if fileInfo is 1:
+      ##TODO: This somehow doesn't work.
+      #volumeArray = slicer.util.array(slicerVolume.GetID())
+      #if volumeArray:
+        #print "Normalizing dose volume " + str(optDose)
+        #volumeArray[:] = volumeArray[:]*100/optDose
+        #slicerVolume.GetImageData().Modified()
+      #else:
+	#print "Can't obtain Dose array"
 
     pbar.setValue(100)
             
@@ -595,7 +601,7 @@ class LoadCTXLogic:
 	  colorNode = slicer.util.getNode('GSI*')
 	  if not colorNode:
 	    colorNode = self.CreateDefaultGSIColorTable()	    
-          slicerVolumeDisplay.SetWindowLevelMinMax(0,110)
+          slicerVolumeDisplay.SetWindowLevelMinMax(0,optDose*1.05)
           slicerVolumeDisplay.SetAndObserveColorNodeID(colorNode.GetID())
           slicerVolumeDisplay.SetThreshold(1,600)
         slicerVolumeDisplay.ApplyThresholdOn()
@@ -604,6 +610,7 @@ class LoadCTXLogic:
 
     pbar.close()
     qt.QApplication.restoreOverrideCursor()
+    print "Done!"
     return slicerVolume.GetID()
 
     
