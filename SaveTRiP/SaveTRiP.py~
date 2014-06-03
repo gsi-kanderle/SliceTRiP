@@ -1,7 +1,9 @@
 import os
 import unittest
 from __main__ import vtk, qt, ctk, slicer
-import pytrip
+
+import LoadCTXLib
+
 import numpy as np
 
 #import SaveTRiPLib
@@ -320,7 +322,7 @@ class SaveTRiPLogic:
     #if not node.IsA('vtkMRMLVectorVolumeNode') or node.IsA('vtkMRMLScalarVolumeNode'):
       #raise "Can export only Scalar and Vector Volumes"
       
-    cube = pytrip.cube.Cube()
+    cube = LoadCTXLib.cube.Cube()
     array = slicer.util.array(node.GetID())
     # Get dimensions and spacing and set it into header
     dim = node.GetImageData().GetDimensions()
@@ -379,8 +381,8 @@ class SaveTRiPLogic:
       
       print "Converting slicer node into pytrip cube " + str(node.GetID())
       #Getting vector field from transform node
-      if node.IsA('vtkMRMLGridTransformNode'):
-	print "Converting Grid Transform Node to Vector Field"
+      if node.IsA('vtkMRMLGridTransformNode') or node.IsA('vtkMRMLBSplineTransformNode'):
+	print "Converting Transform Node to Vector Field"
 	trans = node.GetTransformFromParent()#.GetConcatenatedTransform(0)
 	trans.Inverse()
 	im = trans.GetDisplacementGrid()

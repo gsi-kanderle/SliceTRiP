@@ -1,7 +1,9 @@
 import os
 import unittest
 from __main__ import vtk, qt, ctk, slicer
-import pytrip
+
+import LoadCTXLib
+
 import numpy as np
 
 #import SaveTRiPLib
@@ -320,7 +322,7 @@ class SaveTRiPLogic:
     #if not node.IsA('vtkMRMLVectorVolumeNode') or node.IsA('vtkMRMLScalarVolumeNode'):
       #raise "Can export only Scalar and Vector Volumes"
       
-    cube = pytrip.cube.Cube()
+    cube = LoadCTXLib.cube.Cube()
     array = slicer.util.array(node.GetID())
     # Get dimensions and spacing and set it into header
     dim = node.GetImageData().GetDimensions()
