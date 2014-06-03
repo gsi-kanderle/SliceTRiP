@@ -17,6 +17,7 @@ class Voi():
     self.stdev = 0
     self.mdian = 0
     self.volume = 0 # in cc
+    self.rescaledVolume = 0 # if different in PT
     self.voxVol=0
     self.d10=0
     self.d30=0
@@ -50,7 +51,7 @@ class Voi():
       print "Volumes not the same for: " + self.name
     self.volume = voi1.volume
     
-    namesList = ['calcPerscDose','maxDose','meanDose','d10','d30']
+    namesList = ['calcPerscDose','maxDose','meanDose','d10','d30','d99']
     for name in namesList:
       difference = self.getDifferenceForMethodName(name,voi1,voi2)
       setattr(self, name, difference)
@@ -140,6 +141,10 @@ class Voi():
     self.d95105 = self.setValue(95) - self.setValue(105)
     self.d99 = self.setValue(99)
     
+    #Find out volume, which gets 24 Gy. Important for CTV
+    index = np.where( self.x == 24 )
+    self.v24Gy = round(self.y[index],2)
+    
     if not self.perscDose == 0:
       percantage = self.perscVolume*1e2/self.volume
       calcDose = self.setValue(percantage)
@@ -228,6 +233,9 @@ class Voi():
     
     
   def setVolumes(self,patientFlag):
+    #Skip target volumes
+    if self.name.find('ctv') > -1 or self.name.find('itv') > -1 or self.name.find('ptv') > -1:
+      return
     rescaledVolume = 0
     if patientFlag == 0:
       print "Wrong patient number!"
@@ -250,27 +258,8 @@ class Voi():
     if not rescaledVolume == 0:
       if abs(self.volume-rescaledVolume)/rescaledVolume > 0.1:
 	self.y = np.array(self.y)*self.volume/rescaledVolume
-	self.volume = rescaledVolume
-      #patientOarVolumes=np.zeros(len(names))
-      #if patientFlag==2:
-        #patientOarVolumes=[54,878,58,0,1.8,210,0,0,2725,2876,805]
-      #elif patientFlag==4:
-	#patientOarVolumes=[40.7,337.7,66.4,0,2.21,300.0,0,2828.1,1266,1552,1208,0,140,0,8.8,0]
-      #elif patientFlag==5:
-	#patientOarVolumes=[60,499,35,0,0.8,185,0,0,792,1071,0]
-      #elif patientFlag==6:
-	#patientOarVolumes=[26.4,686,35.3,0,5,209,0,0,2479,2654,0,0,0,42,22,5.5,0]
-      #elif patientFlag==12:
-	#patientOarVolumes=[27.3,551.8,40.8,0,1.56,283.1,0,0,1781,1456,0,124.5,0,40.2,0,0,0]
-      #elif patientFlag==15:
-	#patientOarVolumes=[24.5,0,41.2,0,0,64.6,0,0,1968,1812,0,3,0,37.1,0]
-      #elif patientFlag==16:
-	#patientOarVolumes=[36.6,386,35.6,0,0,276,0,2113,895,1211,0,0,198,22.2,11.2,0]
-	
-      #if index < len(patientOarVolumes):
-	#rescaledVolume = patientOarVolumes[index]
-      #else:
-	#rescaledVolume = 0
+	self.rescaledVolume = rescaledVolume
+
       
   def setName(self,name):
     if name.find('PA') > -1 or name.find('Pulmonary') > -1:

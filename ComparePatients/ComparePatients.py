@@ -373,20 +373,21 @@ class ComparePatientsLogic:
   
   
   def exportMetricToClipboard(self,patientList,metric,planPTV=False):
-    voiOrder = ["heart","spinalcord","smallerairways","esophagus","trachea",
-                "aorta","vesselslarge","airwayslarge","brachialplexus","carina",
-                "ivc","largebronchus","svc","liver","lungl","lungr"]
-    #voiOrder = ["ctv"]
-    #metric = "d99"
+    #voiOrder = ["heart","spinalcord","smallerairways","esophagus","trachea",
+                #"aorta","vesselslarge","airwayslarge","brachialplexus","carina",
+                #"ivc","largebronchus","svc","liver","lungl","lungr"]
+
+    voiOrder = ["ctv"]
+    metric = "d99"
     #File path for pps file:
     ppsFilePath = '/u/kanderle/AIXd/Data/FC/planpars/'
     output_str = 'Difference in ' + metric + '\n'
     output_str += 'Patient name\t'
     for voi in voiOrder:
       output_str += voi + '\t'
-    planPTV=True
+    planPTV= False
     normOn = False
-    ctvOn = True
+    #ctvOn = True
     output_str += '\n'
     maxLungDose = 0
     #Flag for following ipsilateral lungl
@@ -452,7 +453,7 @@ class ComparePatientsLogic:
 	  metricD99 = 'd99'
 	  for targetStr in targets:
 	    if targetStr:
-	      target = newPatient.bestPlan.get_voi_by_name(targetStr)
+	      target = newPatient.get_voiDifference_by_name(targetStr)
 	      if target:
 		print "Found target: " + targetStr
 	        output_str += str(getattr(target,metricD99)) +'\t'
@@ -460,7 +461,8 @@ class ComparePatientsLogic:
 	
       else:
 	print "Not enough data."
-
+      
+    print output_str
     clipboard = qt.QApplication.clipboard()
     clipboard.setText(output_str,qt.QClipboard.Selection)
     clipboard.setText(output_str,qt.QClipboard.Clipboard)

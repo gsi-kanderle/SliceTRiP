@@ -42,16 +42,21 @@ def compareToSbrt(patient,voiList=[],planPTV = False):
   
   findIpsiLateralLung(sbrtPlan)
   
+  
   if not voiList == []:
     for voi in voiList:
       voiSbrt = sbrtPlan.get_voi_by_name(voi)
       voiPlan = patient.bestPlan.get_voi_by_name(voi)
+      
       if voiSbrt:
 	#If there's no VOI in plan it has dose 0.
 	if voiPlan:
+	  print voiSbrt.name + "in sbrt has d99: " + str(voiSbrt.d99)
+	  print voiPlan.name + "in PT has d99: " + str(voiPlan.d99)
 	  v = Voi.Voi(voi)
 	  v.createVoiDifference(voiSbrt,voiPlan)
 	  patient.voiDifferences.append(v)
+	  print "And the difference is: " + str(v.d99) 
 	else:
 	  patient.voiDifferences.append(voiSbrt)
   else:
@@ -462,12 +467,17 @@ class Plan():
     table.setRowCount(len(self.vois))
     table.setVerticalHeaderLabels(self.get_voi_names())
         
+    print self.fileName
+    
     for i in range(0,len(self.vois)):
       checkBox = qt.QCheckBox()
       if checkBox:
         self.voiTableCheckBox.append(checkBox)
         table.setCellWidget(i,0,checkBox)
-      self.setVoiTable(table,self.vois[i],i)
+      voi = self.vois[i]
+      doseValues = [str(voi.maxDose)+"/"+str(voi.maxPerscDose),str(voi.d99),str(voi.d10),str(voi.d30),
+           str(voi.calcPerscDose)+"/"+str(voi.perscDose),str(voi.volume)+"/"+str(voi.rescaledVolume)]
+      self.setVoiTable(table,voi,doseValues,i)
       #self.voiComboBox.addItem(voi)
     
     table.visible = True
@@ -475,15 +485,15 @@ class Plan():
     self.voiTable = table
     
  
-  def setVoiTable(self,table,voi,n):
-    voi.setDvhTableItems(self.horizontalHeaders) 
-    a = [str(voi.maxDose)+"/"+str(voi.maxPerscDose),str(voi.d99),str(voi.d10),str(voi.d30),
-           str(voi.calcPerscDose)+"/"+str(voi.perscDose),str(voi.volume)]
+  def setVoiTable(self,table,voi,doseValues,n):
+    voi.setDvhTableItems(self.horizontalHeaders)
+    #doseValues = [str(voi.maxDose)+"/"+str(voi.maxPerscDose),str(voi.d99),str(voi.d10),str(voi.d30),
+           #str(voi.calcPerscDose)+"/"+str(voi.perscDose),str(voi.volume)]
     for i in range(1,len(self.horizontalHeaders)):
       item = voi.dvhTableItems[i-1]
       table.setItem(n,i,item)
-      if not len(a) == len(voi.dvhTableItems):
+      if not len(doseValues) == len(voi.dvhTableItems):
 	print "Not enough table items, check code."
-      item.setText(a[i-1])
+      item.setText(doseValues[i-1])
       #if voi.overOarDose:
 	#item.setBackground(qt.QColor().fromRgbF(1,0,0,1))
