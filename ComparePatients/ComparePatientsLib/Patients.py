@@ -20,21 +20,17 @@ def compareToSbrt(patient,voiList=[],planPTV = False):
     
   if not patient.bestPlan and not planPTV:
     patient.loadBestPlan()
-    if not patient.bestPlan:
-      return False
+
   
   if not patient.bestPlan:
+    print "No best plan"
     return False
   else:
     print patient.name + " has best plan: " + patient.bestPlan.fileName
   
   sbrtPlan = None
-  for plan in patient.plans:
-    if plan.sbrt:
-      if patient.name == 'Lung021':
-	if plan.fileName.find('_L') > -1 or plan.fileName.find('_R') > -1: 
-	  continue
-      sbrtPlan = plan
+  sbrtPlan = patient.loadSBRTPlan()
+  
       
   if not sbrtPlan:
     print "No sbrt plan"
@@ -51,12 +47,14 @@ def compareToSbrt(patient,voiList=[],planPTV = False):
       if voiSbrt:
 	#If there's no VOI in plan it has dose 0.
 	if voiPlan:
-	  print voiSbrt.name + "in sbrt has d99: " + str(voiSbrt.d99)
-	  print voiPlan.name + "in PT has d99: " + str(voiPlan.d99)
 	  v = Voi.Voi(voi)
+	  #if voiSbrt.name.find('lung') > -1:
+		  #print voiSbrt.name + "has d10 sbrt: " + str(voiSbrt.d10)
+		  #print voiSbrt.name + "has d10 pt: " + str(voiPlan.d10)
+		  
 	  v.createVoiDifference(voiSbrt,voiPlan)
 	  patient.voiDifferences.append(v)
-	  print "And the difference is: " + str(v.d99) 
+
 	else:
 	  patient.voiDifferences.append(voiSbrt)
   else:
@@ -94,7 +92,8 @@ def readPatientData(newPatient,planPTV=False):
     
   
   filePath = '/u/kanderle/AIXd/Data/FC/' + newPatient.name
-    
+  twoPlans = False #Flag for setting the best plan  
+  
   if os.path.exists(filePath):
     filePathGD = filePath + '/GD/'
     for fileName in os.listdir(filePathGD):
@@ -118,34 +117,46 @@ def readPatientData(newPatient,planPTV=False):
 	  newPlan.patientFlag = newPatient.number
 	  newPlan.readGDFile(filePathGD + fileName)
 	  newPatient.add_plan(newPlan)
-	  if not newPatient.bestPlan and not planPTV:
-	    if not newPlan.targetPTV:
+	  if not planPTV and not newPlan.targetPTV and not twoPlans:
+            if not newPatient.bestPlan:
 	      newPatient.bestPlan = newPlan
-	  else:
-	    if newPlan.targetPTV:
-	      pass
 	    else:
 	      newPatient.bestPlan = None
+	      twoPlans = True
+	  elif planPTV and newPlan.targetPTV and not twoPlans:
+	    if not newPatient.bestPlan:
+	      newPatient.bestPlan = newPlan
+	    else:
+	      newPatient.bestPlan = None
+	      twoPlans = True
         if filePrefix.find('sbrt') > -1:
-	  newPlan = Plan()
-	  newPlan.patientFlag = newPatient.number
-	  newPlan.fileName = fileName
-	  #Manual input, because it can't read it from fileName
-	  newPlan.optDose = 25
+	  #Find existing sbrt plan, otherwise create new
+	  newPlan = newPatient.loadSBRTPlan()
+	  if not newPlan:
+	    newPlan = Plan()
+	    newPlan.patientFlag = newPatient.number
+	    newPlan.fileName = fileName
+	    #Manual input, because it can't read it from fileName
+	    newPlan.optDose = 25
+	    newPlan.sbrt = True
+	    newPlan.targetPTV = True
+	    newPatient.add_plan(newPlan)
 	  newPlan.readGDFile(filePathGD + fileName)
-	  newPlan.sbrt = True
-	  newPlan.targetPTV = True
-	  newPatient.add_plan(newPlan)
       if fileExtension == '.txt':
 	if filePrefix.find('sbrt') > -1:
+	  #Find existing sbrt plan, otherwise create new
+	  sbrtPlan = newPatient.loadSBRTPlan()
+	  if not sbrtPlan:
+	    sbrtPlan = Plan()
+	    sbrtPlan.patientFlag = newPatient.number
+	    sbrtPlan.fileName = fileName
+	    newPatient.add_plan(sbrtPlan)
+	  #Read values and dvh 
 	  if filePrefix.find('dvh') > -1:
-	    continue	    
-	  newPlan = Plan()
-	  newPlan.patientFlag = newPatient.number
-	  newPlan.fileName = fileName
-	  newPlan.readTxtFile(filePathGD + fileName)
-	  newPatient.add_plan(newPlan)
-	   
+	    sbrtPlan.readTxtDvhFile(filePathGD + fileName)
+	  else:
+	    sbrtPlan.readTxtFile(filePathGD + fileName)
+	  
 
 class Patient():
   def __init__(self,name):
@@ -193,12 +204,27 @@ class Patient():
         
   
   def loadPTVPlan(self):
+    self.loadBestPlan(True)
+    if self.bestPlan:
+      return
     for plan in self.plans:
       if not plan.sbrt and plan.targetPTV:
 	self.bestPlan = plan
+	return
+    self.bestPlan = None
     
-  def loadBestPlan(self):
+  def loadSBRTPlan(self):
+    for plan in self.plans:
+      if plan.sbrt:
+        if self.name == 'Lung021':
+	  if plan.fileName.find('_L') > -1 or plan.fileName.find('_R') > -1: 
+	    continue
+        return plan
+    return None
+  
+  def loadBestPlan(self,PTV=False):
     filePath = self.infoFilePath
+    fileName = ''
     if not os.path.isfile(filePath):
       print "No bestPlan file."
       return
@@ -206,8 +232,15 @@ class Patient():
     content = f.read().split('\n')
     f.close()
     for column in content:
-      if column.find('BestPlan') > -1:
-	fileName = column.split()[1]
+      if PTV:
+        if column.find('BestPTVPlan') > -1:
+          fileName = column.split()[1]      
+      else:
+        if column.find('BestPlan') > -1:
+	  fileName = column.split()[1]
+      
+    if not fileName:
+      return
     
     for plan in self.plans:
       if plan.fileName == fileName:
@@ -222,16 +255,20 @@ class Patient():
       print "No best Plan yet!"
       return
     filePath = self.infoFilePath
+    if self.bestPlan.targetPTV:
+      name = 'BestPTVPlan:'
+    else:
+      name = 'BestPlan:'
     if os.path.isfile(filePath):
       f = open(filePath,"r")
       content = str(f.read())
       f.close()
-      if content.find('BestPlan:') > -1:
+      if content.find(name) > -1:
 	print "Already exist"
         return
     else:
       content = ""
-    content += 'BestPlan:\t' + self.bestPlan.fileName
+    content += name + '\t' + self.bestPlan.fileName + '\n'
     
     f = open(filePath,"wb+")
     f.write(content)
@@ -267,7 +304,7 @@ class Plan():
     self.patientFlag = 0
     self.vois = []
     self.slicerNodeID = ''
-    self.voiTable = None
+    #self.voiTable = None
     self.voiTableCheckBox = []
     self.horizontalHeaders=['Show:',"Max(Gy)","D99%(Gy)","D10%(Gy)","D30(Gy)","per. Volume (Gy)","Volume(cc)"]
     
@@ -291,6 +328,8 @@ class Plan():
   def readTxtDvhFile(self,filePath):
     
     self.filePath = filePath
+    self.sbrt = True
+    
     fp = open(filePath,"r")
     content = fp.read().split('\n')
     fp.close()
@@ -310,13 +349,14 @@ class Plan():
 	  self.add_voi(v)
 	  
 	v.readTxtDvhFile(content,i)
+	v.calculateDose()
 	voiOn = False
 
       if volumeOn:
 	if v:
 	  volume = float(column)
-	  if abs(v.volume - volume) < 0.1:
-	    print "Volumes not matching for " + v.name
+	  #if abs(v.volume - volume) < 0.1:
+	    #print "Volumes not matching for " + v.name
 	
 	volumeOn = False
       
@@ -329,7 +369,29 @@ class Plan():
 	i += 2
       
       
-    
+  def readTxtFile(self,filePath):
+    self.filePath = filePath
+    self.sbrt = True
+    self.targetPTV = True
+    fp = open(filePath,"r")
+    content = fp.read().split('\n')
+    fp.close()
+    n=len(content)
+    i=1
+    for line in content:
+      if not line:
+	continue
+      if line.split()[0] == 'Oar':
+	continue
+      v = self.get_voi_by_name(line.split()[0])
+      if not v:
+        v = Voi.Voi(line.split()[0], self.optDose)
+        self.add_voi(v)
+      v.readTxtFile(line)
+      v.setOarConstraints()
+      v.setDefaultVolumes(self.patientFlag)
+        
+  
   def readGDFileName(self,filePrefix): 
     
     self.sbrt = False
@@ -343,9 +405,9 @@ class Plan():
     if find > -1:
       self.optDose = int(filePrefix[find+2:find+4])
       
-    find = filePrefix.find('_b')
-    if find > 0:
-      self.numberOfFields = int(filePrefix[find+2:find+4])
+    #find = filePrefix.find('_b')
+    #if find > 0:
+      #self.numberOfFields = int(filePrefix[find+2:find+4])
       
     if filePrefix.find('PTV') > -1:
       self.targetPTV = True
@@ -367,25 +429,6 @@ class Plan():
 	else:
 	  self.oarWeigth = float(filePrefixRest[find2+1:find3-1])
 	  
-  def readTxtFile(self,filePath):
-    self.filePath = filePath
-    self.sbrt = True
-    self.targetPTV = True
-    fp = open(filePath,"r")
-    content = fp.read().split('\n')
-    fp.close()
-    n=len(content)
-    i=1
-    for line in content:
-      if not line:
-	continue
-      if line.split()[0] == 'Oar':
-	continue
-      v = Voi.Voi(line.split()[0], self.optDose)
-      v.readTxtFile(line)
-      v.setOarConstraints()
-      v.setDefaultVolumes(self.patientFlag)
-      self.add_voi(v)
   
   def readGDFile(self,filePath):
     self.filePath=filePath
@@ -404,13 +447,15 @@ class Plan():
 	  i += 1
 	  continue
 	else:
-	  v = Voi.Voi(line.split()[1], self.optDose)
+	  v = self.get_voi_by_name(line.split()[1])
+	  if not v:
+	    v = Voi.Voi(line.split()[1], self.optDose)
+	    self.add_voi(v)
 	  i = v.readGDFile(content,i)
 	  v.setOarConstraints()
 	  v.setVolumes(self.patientFlag)
 	  v.calculateDose()
-	  self.add_voi(v)
-	  #print v.name
+	  
           #v.setSlicerOrigin(self.dimx,self.dimy,self.pixel_size)
       i += 1
 
@@ -446,18 +491,11 @@ class Plan():
       #output_str += (nameit+'\n')
     return output_str
   
-  def setTable(self,layout):
+  def setTable(self,table):
     from __main__ import qt
-    # Voi Table
-    table = self.voiTable
-    if table:
-      table.clearContents()
-    else:
-      
-      
-      table= qt.QTableWidget()
-      layout.addRow(table)
-    #table.visible = False
+    if not table:
+      print "No table."
+      return
     
     
     table.setColumnCount(len(self.horizontalHeaders))
@@ -482,7 +520,7 @@ class Plan():
     
     table.visible = True
     table.resizeColumnsToContents()
-    self.voiTable = table
+
     
  
   def setVoiTable(self,table,voi,doseValues,n):
@@ -497,3 +535,4 @@ class Plan():
       item.setText(doseValues[i-1])
       #if voi.overOarDose:
 	#item.setBackground(qt.QColor().fromRgbF(1,0,0,1))
+

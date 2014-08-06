@@ -23,6 +23,7 @@ class Voi():
     self.d30=0
     self.d95105=0
     self.d99 = 0
+    self.v24Gy = 0
     self.dvhTableItems = []
     self.perscDose = 0
     self.perscVolume = 1
@@ -31,8 +32,8 @@ class Voi():
     self.calcPerscDose = 0
     self.overOarDose = False
     self.ipsiLateral = False
-   
-  
+    self.doubleArrayNode = None #Slicer double array node
+
   def readTxtDvhFile(self, content, i):
     n = len(content)
     self.x = np.zeros(n-1)
@@ -40,9 +41,10 @@ class Voi():
     row = 1
     while row < n:
       line = content[row]
-      self.x[n] = line.split()[i]
-      self.y[n] = line.split()[i+1]
-      
+      if line:
+	
+	self.x[row] = float(line.split()[i])
+	self.y[row] = float(line.split()[i+1])
       row += 1
     
   #Function for creating difference between two voi values
@@ -51,7 +53,7 @@ class Voi():
       print "Volumes not the same for: " + self.name
     self.volume = voi1.volume
     
-    namesList = ['calcPerscDose','maxDose','meanDose','d10','d30','d99']
+    namesList = ['calcPerscDose','maxDose','meanDose','d10','d30','d99','v24Gy']
     for name in namesList:
       difference = self.getDifferenceForMethodName(name,voi1,voi2)
       setattr(self, name, difference)
@@ -132,14 +134,19 @@ class Voi():
   def calculateDose(self):
     
     # If doses are to small, ignore.
-    if self.maxDose < 1e-3:
-      return
+    #if self.maxDose < 1e-3:
+      #return
       
     self.d10 = self.setValue(10)
     #self.d10 = self.d10*dose
     self.d30 = self.setValue(30)
     self.d95105 = self.setValue(95) - self.setValue(105)
     self.d99 = self.setValue(99)
+    
+    #Find out volume, which gets 24 Gy. Important for CTV
+    array = abs(self.x-24)
+    index = np.argmin(array)
+    self.v24Gy = round(self.y[index],2)
     
     if not self.perscDose == 0:
       percantage = self.perscVolume*1e2/self.volume
@@ -260,9 +267,11 @@ class Voi():
   def setName(self,name):
     if name.find('PA') > -1 or name.find('Pulmonary') > -1:
       name = 'vesselslarge'
-    if name.find('.'):
-      name = name.replace(".","")
+    #if name.find('.'):
+      #name = name.replace(".","")
     name = name.lower()
+    if name.find("smallerairways") > -1:
+	name = "smallerairways"
     self.name = name
     
   def setDvhTableItems(self,horizontalHeaders):

@@ -1,3 +1,4 @@
+# -*- coding: iso-8859-1 -*-
 import os
 import unittest
 from __main__ import vtk, qt, ctk, slicer
@@ -125,6 +126,7 @@ class ComparePatientsWidget:
     self.planComboBox.enabled = False
     self.parametersFormLayout.addRow("Select plan: ", self.planComboBox)
     
+    
     # Metrics list (max Dose, mean Dose...)
     self.metricComboBox = qt.QComboBox()
     self.metricComboBox.enabled = False
@@ -141,7 +143,7 @@ class ComparePatientsWidget:
     #
     # Compare to SBRT Button
     #
-    self.compareButton = qt.QPushButton("Compare to SBRT")
+    self.compareButton = qt.QPushButton("Show VOI Data")
     self.compareButton.toolTip = "Calculates and visualizes plan to SBRT."
     self.compareButton.enabled = False
     self.parametersFormLayout.addRow(self.compareButton)
@@ -158,10 +160,36 @@ class ComparePatientsWidget:
     #
     # Save Best Plan Button
     #
+    self.plotDVHButton = qt.QPushButton("Plot!")
+    self.plotDVHButton.toolTip = "Plot dvh."
+    self.plotDVHButton.enabled =True
+    self.parametersFormLayout.addRow(self.plotDVHButton)
+    
+    # Plan PTV
+    self.PTVCheckBox = qt.QCheckBox()     
+    self.PTVCheckBox.setToolTip( "Look at the plans for PTV" )
+    self.PTVCheckBox.setCheckState(0)
+    self.parametersFormLayout.addRow("PTV plan:", self.PTVCheckBox)
+    
+    # Plan PTV
+    self.normalizeCheckBox = qt.QCheckBox()     
+    self.normalizeCheckBox.setToolTip( "Normalize dose" )
+    self.normalizeCheckBox.setCheckState(0)
+    self.parametersFormLayout.addRow("Normalize:", self.normalizeCheckBox)
+    #
+    # Copy to Clipboard Button
+    #
     self.toClipboardButton = qt.QPushButton("Copy values to clipboard")
     self.toClipboardButton.toolTip = "Take difference from best plan and sbrt from desired metric."
     self.toClipboardButton.enabled =True
     self.parametersFormLayout.addRow(self.toClipboardButton)
+    
+    #
+    # Export DVH
+    #
+    self.exportDVHButton = qt.QPushButton("Copy DVH to Clipboard")
+    self.exportDVHButton.enabled = True
+    self.parametersFormLayout.addRow(self.exportDVHButton)
     
     # Voi list
     self.voiComboBox = qt.QComboBox()
@@ -175,21 +203,32 @@ class ComparePatientsWidget:
     self.showButton.toolTip = "Run the algorithm."
     self.showButton.enabled = True
     self.parametersFormLayout.addRow(self.showButton)
+    
+    
+    
+    #Voi table
+    self.voiTable= qt.QTableWidget()
+    self.parametersFormLayout.addRow(self.voiTable)
+    self.voiTable.visible = False
 
     # connections
     self.showPlan.connect('clicked(bool)', self.onShowPlanButton)
     self.compareButton.connect('clicked(bool)', self.onCompareButton)
     self.saveBestPlan.connect('clicked(bool)', self.onSaveBestPlanButton)
+    self.plotDVHButton.connect('clicked(bool)', self.onShowDVHButton)
     self.toClipboardButton.connect('clicked(bool)', self.onToClipboardButton)
     self.patientComboBox.connect('currentIndexChanged(int)', self.setPlanComboBox)
     self.showButton.connect('clicked(bool)', self.onShowVoiButton)
+    self.exportDVHButton.connect('clicked(bool)', self.onExportDVHButton)
 
     # Add vertical spacer
     self.layout.addStretch(1)
     
-    
-    self.table = None
+
     self.binfo = None
+    
+    #First run
+    self.setPlanComboBox(0)
   
   def cleanup(self):
     pass
@@ -200,13 +239,24 @@ class ComparePatientsWidget:
     #patient = self.getCurrentPatient()
     #selectedPlan = self.getCurrentPlan()
     logic = ComparePatientsLogic()
-    logic.exportMetricToClipboard(self.patientList,metric,planPTV = True)
+    if self.PTVCheckBox.checkState() == 0:
+      planPTV = False
+    else:
+      planPTV = True
+      
+    if self.normalizeCheckBox.checkState() == 0:
+      normalize = False
+    else:
+      normalize = True
+    logic.exportMetricToClipboard(self.patientList,metric,planPTV,normalize)
     
   def onCompareButton(self):
+    self.voiTable.clearContents()
     metric = self.metricComboBox.currentText
     patient = self.getCurrentPatient()
     selectedPlan = self.getCurrentPlan()
-    selectedPlan.setTable(self.parametersFormLayout)
+    selectedPlan.setTable(self.voiTable)
+
     #logic = ComparePatientsLogic()
     #logic.visualizeComparison(patient,selectedPlan,metric)
     
@@ -218,6 +268,20 @@ class ComparePatientsWidget:
     print("Loading patient plan for: " + plan.fileName)
     logic.loadPlan(newPatient, plan)
 
+  def onShowDVHButton(self):
+    plan = self.getCurrentPlan()
+    #Selected list goes linearly through all checkboxes
+    selectedList = []
+    for i in range(0,len(plan.voiTableCheckBox)):
+      if plan.voiTableCheckBox[i].checkState() == 0:
+	selectedList.append(False)
+      else:
+	selectedList.append(True)
+    logic = ComparePatientsLogic()   
+    logic.addChart(plan,selectedList)
+  
+
+  
   def setPlanComboBox(self,patientNumber):
     self.planComboBox.clear()
     self.planComboBox.enabled = True
@@ -253,6 +317,20 @@ class ComparePatientsWidget:
     self.binfo = binfo
     self.voiComboBox.enabled = True
     
+  def onExportDVHButton(self):
+    plan = self.getCurrentPlan()
+    #Selected list goes linearly through all checkboxes
+    selectedList = []
+    #TODO: Add logic for selecting VOI
+    #for i in range(0,len(plan.voiTableCheckBox)):
+      #if plan.voiTableCheckBox[i].checkState() == 0:
+	#selectedList.append(False)
+      #else:
+	#selectedList.append(True)
+    logic = ComparePatientsLogic()   
+    logic.copyDVHToClipboard(plan)
+    
+  
   def onShowVoiButton(self):
     import LoadCTX
     
@@ -266,8 +344,8 @@ class ComparePatientsWidget:
     n=0 #motion state
     logic = LoadCTX.LoadCTXLogic()
     voi.slicerNodeID[n]=logic.loadCube(filePath,2,motionState=n,voi=voi)
+    
   def onSaveBestPlanButton(self):
-    reload(Patients)
     patient = self.getCurrentPatient()
     patient.bestPlan = self.getCurrentPlan()
     patient.saveBestPlan()
@@ -319,76 +397,78 @@ class ComparePatientsLogic:
   def __init__(self):
     pass
 
-  
-  def setTable(self,layout,patient,metricList):
-    # Voi Table
-    table = patient.slicerTable
-    if table:
-      table.clearContents()
-    else:
-      table= qt.QTableWidget()
-      patient.slicerTable = table
-      layout.addRow(table)
-    #table.visible = False
-    
+  def copyDVHToClipboard(self,plan):
 
-    if not Patients.compareToSbrt(patient):
+    if not plan:
+      print "Error, no plan loaded."
       return
+    
+    voiNames = plan.get_voi_names()
+    output_str = "X (Gy)" + "\t"
+    for voiName in voiNames:
+      output_str += voiName + "\t"
+    output_str += "\n"
+    output_str += "\n"
+    output_str += "\n"
+    dimx = len(plan.vois[0].x)
+    for i in range(0,dimx):
+      if plan.vois[0].x[i] < 0.01:
+        continue
+      output_str += str(plan.vois[0].x[i]) +"\t"
+      for voiName in voiNames:
+        output_str += str(plan.get_voi_by_name(voiName).y[i]) + "\t"
+      output_str += "\n"
       
-    table.setColumnCount(len(metricList))
-    table.setHorizontalHeaderLabels(metricList)
-    table.setEditTriggers(qt.QAbstractItemView.NoEditTriggers)
+    clipboard = qt.QApplication.clipboard()
+    clipboard.setText(output_str,qt.QClipboard.Selection)
+    clipboard.setText(output_str,qt.QClipboard.Clipboard)
 
-    table.setRowCount(len(patient.voiDifferences))
-    table.setVerticalHeaderLabels(patient.get_voiDifferences_names())
-        
-    n = 0
-    for voi in patient.voiDifferences:
-      for i in range(0,len(metricList)):
-	item = qt.QTableWidgetItem()
-	table.setItem(n,i,item)
-	value = getattr(voi,metricList[i])
-	item.setText("tisoc")
-      n += 1
+  def addChart(self,plan,selectedList):
+    if not plan or not selectedList:
+      print "Error, no plan loaded."
+      return
+    ln = slicer.util.getNode(pattern='vtkMRMLLayoutNode*')
+    ln.SetViewArrangement(25)
+    cvn = slicer.util.getNode(pattern='vtkMRMLChartViewNode*')
+    cn = slicer.mrmlScene.AddNode(slicer.vtkMRMLChartNode())
     
-    table.visible = True
-    table.resizeColumnsToContents()
+    vois = plan.get_voi_names()
+    for i in range(0,len(vois)):
+      if selectedList[i]:
+	voi = plan.get_voi_by_name(vois[i])
+	if voi.doubleArrayNode is None:
+	  voi.doubleArrayNode = slicer.mrmlScene.AddNode(slicer.vtkMRMLDoubleArrayNode())
+	  array = voi.doubleArrayNode.GetArray()
+	  array.SetNumberOfTuples(len(voi.x))
+	  for n in range(0,len(voi.x)):
+	    array.SetComponent(n, 0, voi.x[n])
+	    array.SetComponent(n, 1, voi.y[n])
+	    #array.SetComponent(n, 2, voi.err[n])
+	      
+	cn.AddArray(vois[i], voi.doubleArrayNode.GetID())
+	  
+    cn.SetProperty('default', 'xAxisLabel', 'Dose [Gy]')
+    cn.SetProperty('default', 'yAxisLabel', 'Volume [%]')
+    cvn.SetChartNodeID(cn.GetID())
+
     
+  def exportMetricToClipboard(self,patientList,metric,planPTV, normOn):
+    voiOrder = ["heart","spinalcord","smallerairways","esophagus","trachea",
+                "aorta","vesselslarge","airwayslarge","brachialplexus","carina",
+                "ivc","largebronchus","svc","liver","lungl","lungr"]
 
-
-  def setVoiTable(self,table,voi,n,metricList):    
-    for i in range(0,len(metricList)):
-      item = qt.QTableWidgetItem()
-      print n
-      print i
-      table.setItem(n,i,item)
-      value = getattr(voi,metricList[i])
-      print value
-      item.setText()
-      if value > 0:
-	item.setBackground(qt.QColor().fromRgbF(0,1,0,1))
-      else:
-	item.setBackground(qt.QColor().fromRgbF(1,0,0,1))
-  
-  
-  
-  def exportMetricToClipboard(self,patientList,metric,planPTV=False):
-    #voiOrder = ["heart","spinalcord","smallerairways","esophagus","trachea",
-                #"aorta","vesselslarge","airwayslarge","brachialplexus","carina",
-                #"ivc","largebronchus","svc","liver","lungl","lungr"]
-
-    voiOrder = ["ctv"]
-    metric = "d99"
+    #voiOrder = ["ctv","gtv"]
+    #voiOrder = ["sundr"]
+    #metric = "v24Gy"
     #File path for pps file:
     ppsFilePath = '/u/kanderle/AIXd/Data/FC/planpars/'
+    output_str = ""
     output_str = 'Difference in ' + metric + '\n'
     output_str += 'Patient name\t'
     for voi in voiOrder:
       output_str += voi + '\t'
-    planPTV= False
-    normOn = False
     #ctvOn = True
-    output_str += '\n'
+    #output_str += '\n'
     maxLungDose = 0
     #Flag for following ipsilateral lungl
     firstLung = False
@@ -401,62 +481,67 @@ class ComparePatientsLogic:
       ppsFile = ppsFilePath + newPatient.name + '.pps'
       if os.path.isfile(ppsFile):
 	targets = self.readTargetsFromPps(ppsFile)
-
-
       #Create voi difference for each patient - difference between best plan and sbrt
       #print voiOrder
-      #if Patients.compareToSbrt(newPatient,voiOrder,planPTV):
-	#output_str += newPatient.name + '\t'
-	#for voiName in voiOrder:
-	  #voi = newPatient.get_voiDifference_by_name(voiName)
-	  #if voi:
-	    ##Normalization factor
-	    #normFactor = 1
-	    #if normOn:
-	      #if metric == 'maxDose':
-		#normFactor = voi.maxPerscDose
-	      #elif metric == 'calcPerscDose':
-		#normFactor = voi.perscDose
-	      #else:
-		#normFactor = 1	      
-	    #if normFactor == 0:
-	      #output_str += '\t'
-	      #continue
-	    #if voiName.find('lung') > -1:
-	      #if voiName == 'lungl':
-	        #if not voi.ipsiLateral:
-	          #voiContraLateral = voi
-	          #firstLung = True
-	        #else:
-		  #voiIpsiLateral = voi
-	      #elif voiName == 'lungr':
-	        #if firstLung:
-		  #if voi.ipsiLateral:
-		    #voiIpsiLateral = voi
-		  #else:
-		    #print "No ipsi-lateral lung"
-		    #output_str += '-1\t-1\t'
-		#else:
-		  #voiContraLateral = voi
-	      #if voiIpsiLateral and voiContraLateral:
-	        #output_str += str(getattr(voiIpsiLateral,metric)/normFactor) +'\t'
-	        #output_str += str(getattr(voiContraLateral,metric)/normFactor) +'\t'
-	        #voiIpsiLateral = None
-	        #voiContraLateral = None
-	        #firstLung = False
-	    #else:
-	      #output_str += str(getattr(voi,metric)/normFactor) +'\t'
-	  #else:
-	    #output_str += '\t'
-	if targets:
-	  Patients.compareToSbrt(newPatient,targets,planPTV)
-	  metricD99 = 'd99'
-	  for targetStr in targets:
-	    if targetStr:
-	      target = newPatient.get_voiDifference_by_name(targetStr)
-	      if target:
-		print "Found target: " + targetStr
-	        output_str += str(getattr(target,metricD99)) +'\t'
+      if Patients.compareToSbrt(newPatient,voiOrder,planPTV):
+	output_str += newPatient.name + '\t'
+	for voiName in voiOrder:
+	  voi = newPatient.get_voiDifference_by_name(voiName)
+	  if voi:
+	    #Normalization factor
+	    normFactor = 1
+	    if normOn:
+	      if metric == 'maxDose':
+		normFactor = voi.maxPerscDose
+	      elif metric == 'calcPerscDose':
+		normFactor = voi.perscDose
+	      else:
+		normFactor = 1	      
+	    if normFactor == 0:
+	      output_str += '\t'
+	      continue
+	    if voiName.find('lung') > -1:
+	      if voiName == 'lungl':
+	        if not voi.ipsiLateral:
+	          voiContraLateral = voi
+	          firstLung = True
+	        else:
+		  voiIpsiLateral = voi
+	      elif voiName == 'lungr':
+	        if firstLung:
+		  if voi.ipsiLateral:
+		    voiIpsiLateral = voi
+		  else:
+		    print "No ipsi-lateral lung"
+		    output_str += '-1\t-1\t'
+		else:
+		  voiContraLateral = voi
+	      if voiIpsiLateral and voiContraLateral:
+	        output_str += str(round(getattr(voiIpsiLateral,metric)/normFactor,2)) +'\t'
+	        output_str += str(round(getattr(voiContraLateral,metric)/normFactor,2)) +'\t'
+	        voiIpsiLateral = None
+	        voiContraLateral = None
+	        firstLung = False
+	    else:
+	      output_str += str(round(getattr(voi,metric)/normFactor,2)) +'\t'
+	  else:
+	    output_str += '\t'
+	#if targets:
+	  #Patients.compareToSbrt(newPatient,targets,planPTV)
+	  #metricD99 = 'v24Gy'
+	  #targetNames = []
+	  #for targetStr in targets:
+	    #if targetStr:
+	      ##We're interested only in CTV targets
+	      #if targetStr.find('PTV') > -1 or targetStr.find('couch') > -1:
+		#continue
+	      #target = newPatient.get_voiDifference_by_name(targetStr)
+	      #if target:
+		#print "Found target: " + targetStr
+	        #output_str += str(getattr(target,metricD99)) +'\t'
+	        #targetNames.append(targetStr)
+	  #for targetStr in targetNames:
+	    #output_str += targetStr + '\t'
 	output_str += '\n'
 	
       else:
@@ -515,7 +600,7 @@ class ComparePatientsLogic:
       if not os.path.exists(filePathCT):
 	print "No CT at: " + filePathCT
 	return
-      patient.slicerNodeID = loadLogic.loadCube(filePathCT,0)
+      patient.slicerNodeID = loadLogic.loadCube(filePathCT,0, showOn = True)
     
     if plan.slicerNodeID == '':
       filePathPlan = ('/u/kanderle/AIXd/Data/FC/' + patient.name + '/Dose/' + plan.fileName[0:-7] + '_bio.dos')
@@ -524,7 +609,7 @@ class ComparePatientsLogic:
 	if not os.path.exists(filePathPlan):
 	  print "No plan at: " + filePathPlan
 	  return
-      plan.slicerNodeID = loadLogic.loadCube(filePathPlan,1,optDose = 24)
+      plan.slicerNodeID = loadLogic.loadCube(filePathPlan,1,optDose = 24,showOn = True)
     
     #LoadCTXLib.addSeriesInHierarchy(patient,plan)
     
@@ -536,12 +621,10 @@ class ComparePatientsLogic:
     for line in content:
       if not line:
 	continue
-      if line.find('#') > -1:
-	continue
-      if line.find('PTV') > -1:
-	targetList.append(line.split()[2])
-      else:
-	targetList.append(line.split()[2])
+      #if line.find('#') > -1:
+	#continue
+      targetList.append(line.split()[2])
+    print targetList
     return targetList
 
 class ComparePatientsTest(unittest.TestCase):
