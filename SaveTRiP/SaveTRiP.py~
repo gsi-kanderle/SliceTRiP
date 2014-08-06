@@ -369,7 +369,7 @@ class SaveTRiPLogic:
     return cube
 
   #Function for writing pytrip cube or slicer node into file. Filepath is a path to directory.
-  def writeTRiPdata(self, filePath, pytripCube=None, extension='.ctx', nodeID = None, binfoName='',aix = False):
+  def writeTRiPdata(self, filePath, pytripCube=None, extension='.ctx', nodeID = None, binfoName='',aix = False, resample = []):
     
     if nodeID is not None:
       node = slicer.util.getNode( nodeID )
@@ -384,7 +384,8 @@ class SaveTRiPLogic:
       if node.IsA('vtkMRMLGridTransformNode') or node.IsA('vtkMRMLBSplineTransformNode'):
 	print "Converting Transform Node to Vector Field"
 	trans = node.GetTransformFromParent()#.GetConcatenatedTransform(0)
-	trans.Inverse()
+	#trans.Inverse()
+	#trans.Update()
 	im = trans.GetDisplacementGrid()
 	if im is None:
 	  print "Can't get image data. " + str(im)
@@ -395,13 +396,22 @@ class SaveTRiPLogic:
 	vectorVolume.SetAndObserveImageData( im )
 	vectorVolume.SetName( node.GetName() )
 	vectorVolume.SetSpacing( im.GetSpacing() )
+	
 	#vectorVolume.SetOrigin( im.GetOrigin() )
 	
 	#Get Right Direction For Vector Volume
 	#matrix = vtk.vtkMatrix4x4()
+	matrix = trans.GetGridDirectionMatrix()
         #matrix.DeepCopy((-1,0,0,0,0,-1,0,0,0,0,1,0,0,0,0,1))
-        #vectorVolume.SetIJKToRASDirectionMatrix(matrix)
+        vectorVolume.SetIJKToRASDirectionMatrix(matrix)
+        
+        if not resample == []:
+	  newVectorVolume = self.resampleVectorVolume(vectorVolume,resample)
+	  slicer.mrmlScene.RemoveNode(vectorVolume)
+	  vectorVolume = newVectorVolume
+        
 	node = vectorVolume
+
 
       pytripCube = self.getPyTRiPCubeFromNode(node)
 
@@ -440,17 +450,11 @@ class SaveTRiPLogic:
         for i in range(0,3):
 	  # Vector field components in cbt are divided with voxel spacing due to historical reasons.
 	  if i == 2:
-	    if nodeID.find("GridTransform"):
-	      pytripCube.cube = np.array(array[:,::-1,::-1,i])/pytripCube.slice_distance
-	      
-	      #Remove vector node
-	      slicer.mrmlScene.RemoveNode(node)
-	    else:
 	      pytripCube.cube = np.array(array[:,:,:,i])/pytripCube.slice_distance
 	  else:
-	    if nodeID.find("GridTransform"):
-	      print "Changing vector from Grid Transform"
-	      pytripCube.cube = -np.array(array[:,::-1,::-1,i])/pytripCube.pixel_size
+	    if nodeID.find('GridTransform') > -1:
+	      print "Changing sign"
+	      pytripCube.cube = -np.array(array[:,:,:,i])/pytripCube.pixel_size
 	    else:
 	      pytripCube.cube = np.array(array[:,:,:,i])/pytripCube.pixel_size
 	    
@@ -472,6 +476,8 @@ class SaveTRiPLogic:
 	  print("Saving: "+fNameNew)
 	  pytripCube.write_trip_data(fNameNew+extension)
           pytripCube.write_trip_header(fNameNew+".hed")
+        if nodeID.find('GridTransform') > -1:
+          slicer.mrmlScene.RemoveNode(vectorVolume)
       elif node.IsA('vtkMRMLScalarVolumeNode'):
 	pytripCube.write_trip_data(fName+extension)
         pytripCube.write_trip_header(fName+".hed")
@@ -484,6 +490,57 @@ class SaveTRiPLogic:
       
     print("Saved: "+fName+extension)
   
+  
+  
+  def resampleVectorVolume(self,vectorVolume,resample):
+      if not vectorVolume or not vectorVolume.IsA('vtkMRMLVectorVolumeNode'):
+        print "No vector volume for resampling."
+        return
+      
+      if resample == []:
+	print "No resample values."
+	return
+	
+      if not len(resample) == 3:
+        print "Too many values for resampling."
+        return
+      
+      oldVectorVolume = vectorVolume
+      
+      #Create new vector volume
+      newVectorVolume = slicer.vtkMRMLVectorVolumeNode()
+      newVectorVolume.SetName(oldVectorVolume.GetName())
+      slicer.mrmlScene.AddNode(newVectorVolume)
+      
+      #Create strings for resampling
+      spacing = ''
+      size = ''
+      resample = [2,2,1]
+      for i in range(0,len(self.resample)):
+        spacing += str(oldVectorVolume.GetSpacing()[i]*self.resample[i])
+        #extent = oldVectorVolume.GetImageData().GetExtent[2*i+1]
+        extent = oldVectorVolume.GetImageData().GetExtent()[2*i+1]+1
+        size += str(extent/self.resample[i])
+        if i < 2:
+	  spacing += ','
+	  size += ','
+
+      print "Resampling " + oldVectorVolume.GetName() + " to new pixel size " + size 
+      
+      #Set parameters
+      parameters = {} 
+      parameters["inputVolume"] = oldVectorVolume.GetID()
+      parameters["outputVolume"] = newVectorVolume.GetID()
+      parameters["referenceVolume"] = ''
+      parameters["outputImageSpacing"] = spacing
+      parameters["outputImageSize"] = size
+      
+      #Do resampling
+      resampleScalarVolume = slicer.modules.resamplescalarvectordwivolume
+      clNode = slicer.cli.run(resampleScalarVolume, None, parameters, wait_for_completion=True)
+      
+      #Remove old vector node and set new:
+      return newVectorVolume
   
   # Looks at the subject hierarchy node and loops through all child nodes
   def writeBinfile(self,filePath,pytripCube,node,referenceNode):

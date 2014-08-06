@@ -97,11 +97,19 @@ class TRiPDVHWidget:
     self.loadGdButton.enabled = True
     self.parametersFormLayout.addRow(self.loadGdButton)
     
+   #
+    # Patient Name
+    #
+    self.dvhName = qt.QLineEdit()     
+    self.dvhName.setToolTip( "Filepath of gd file." )
+    self.dvhName.text = ''
+    self.parametersFormLayout.addRow('DVH Filepath:', self.dvhName)
+    
     # Input optimized Dose:
     self.inputDose = qt.QDoubleSpinBox()     
     self.inputDose.setToolTip( "Optimization dose." )
     self.inputDose.setValue(25)
-    self.inputDose.setRange(0, 50)
+    self.inputDose.setRange(0, 1020)
     self.parametersFormLayout.addRow("Dose (Gy):", self.inputDose)
     
     ## Voi list
@@ -130,7 +138,7 @@ class TRiPDVHWidget:
     #
     self.exportButton = qt.QPushButton("Export Values")
     self.exportButton.toolTip = "Export all values."
-    self.exportButton.enabled = True
+    self.exportButton.visible = False 
     self.parametersFormLayout.addRow(self.exportButton)
     
     #
@@ -182,6 +190,11 @@ class TRiPDVHWidget:
   def onLoadGdButton(self):
     #self.dvhTable.visible = False
     
+    #Comment this if you want more tables:
+    if self.dvh:
+      self.parametersFormLayout.removeWidget(self.dvh[0].voiTable)
+    self.dvh = []
+    
     loadFileName = qt.QFileDialog()
     filePath=loadFileName.getOpenFileName()
     filePrefix, fileExtension = os.path.splitext(filePath)
@@ -191,17 +204,20 @@ class TRiPDVHWidget:
       print "Wrong extension"
       return
     
-    self.readDoseFromFilename(filePrefix)
+    #self.readDoseFromFilename(filePrefix)
     patientFlag = self.readPatientFlagFromFilename(filePrefix)
     #self.dvh = None
     #self.voiTableCheckBox = []
     #self.voiTable.clear()
-    dvh = DVH(optDose=self.inputDose.value,patientFlag=patientFlag)
+    #optDose = 25
+    optDose = self.inputDose.value
+    dvh = DVH(optDose=optDose,patientFlag=patientFlag)
     dvh.readFile(filePath)
     #TODO: Dodaj error, ce je neuspesn
     dvh.setTable(self.parametersFormLayout)
     self.applyButton.enabled=True
     self.dvh.append( dvh )
+    self.dvhName.text = dvh.filePath
 
   def onApplyButton(self):
     
@@ -357,6 +373,7 @@ class TRiPDVHLogic:
 
     cn.SetProperty('default', 'xAxisLabel', 'Dose [Gy]')
     cn.SetProperty('default', 'yAxisLabel', 'Volume [%]')
+    cn.SetProperty('default', 'title', os.path.basename(dvhs[-1].filePath))
     cvn.SetChartNodeID(cn.GetID())
     return
 
@@ -418,6 +435,7 @@ class DVH():
         
     for i in range(0,len(self.vois)):
       checkBox = qt.QCheckBox()
+      checkBox.setCheckState(0)
       self.voiTableCheckBox.append(checkBox)
       table.setCellWidget(i,0,checkBox)
       self.setVoiTable(table,self.vois[i],i)
@@ -552,7 +570,8 @@ class Voi():
     self.minimum = float(line.split()[2])*self.optDose
     self.maximumDose = round(float(line.split()[3]),2)*self.optDose
     self.mean = float(line.split()[4])*self.optDose
-    self.stdev = float(line.split()[5])*self.optDose
+    if not line.split()[5] == 'NaNQ':
+      self.stdev = float(line.split()[5])*self.optDose
     self.mdian = float(line.split()[6])*self.optDose
     self.volume = round(float(line.split()[7])/1000,2)
     self.voxVol=float(line.split()[8])
@@ -667,7 +686,7 @@ class Voi():
     if patientFlag:
       patientOarVolumes=np.zeros(len(names))
       if patientFlag==2:
-        patientOarVolumes=[54,878,58,0,1.8,210,0,0,2725,2876,805]
+        patientOarVolumes=[54,878,58,0,1.8,210,0,0,1362,1438,805]
       elif patientFlag==4:
 	patientOarVolumes=[40.7,337.7,66.4,0,2.21,300.0,0,2828.1,1266,1552,1208,0,140,0,8.8,0]
       elif patientFlag==5:
@@ -686,11 +705,11 @@ class Voi():
       else:
 	rescaledVolume = 0
 	
-      if not rescaledVolume == 0:
-	if abs(self.volume-rescaledVolume)/rescaledVolume > 0.1:
-	  self.y = np.array(self.y)*self.volume/rescaledVolume
-	  self.volume = rescaledVolume
-	  print "setting volume for: " + names[index]
+      #if not rescaledVolume == 0:
+	#if abs(self.volume-rescaledVolume)/rescaledVolume > 0.1:
+	  #self.y = np.array(self.y)*self.volume/rescaledVolume
+	  #self.volume = rescaledVolume
+	  #print "setting volume for: " + names[index]
 	  
       
    
