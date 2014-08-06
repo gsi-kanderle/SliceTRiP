@@ -852,12 +852,27 @@ class LoadCTXLogic:
         colorTableNode.AddColor(str(i), 0.02, 0.5, 0, 0.2);
       elif i<195:
         colorTableNode.AddColor(str(i), 0.02, 1, 0, 0.2);
-      elif i<243:
+      elif i<231:
         colorTableNode.AddColor(str(i), 1, 1, 0, 0.2);
-      elif i<254:
+      elif i<255:
         colorTableNode.AddColor(str(i), 1, 0, 0, 0.2);
       else:
 	colorTableNode.AddColor(str(i), 1, 0, 1, 1);
+    #for i in range(0,256):
+      #if i<49:
+        #colorTableNode.AddColor(str(i), 0.06, 0, 1, 0.2);
+      #elif i<98:
+	#colorTableNode.AddColor(str(i), 0, 0.94, 1, 0.2);
+      #elif i<147:
+        #colorTableNode.AddColor(str(i), 0.02, 0.5, 0, 0.2);
+      #elif i<195:
+        #colorTableNode.AddColor(str(i), 0.02, 1, 0, 0.2);
+      #elif i<243:
+        #colorTableNode.AddColor(str(i), 1, 1, 0, 0.2);
+      #elif i<255:
+        #colorTableNode.AddColor(str(i), 1, 0, 0, 0.2);
+      #else:
+	#colorTableNode.AddColor(str(i), 1, 0, 1, 1);
 
     slicer.mrmlScene.AddNode( colorTableNode )
     return colorTableNode
