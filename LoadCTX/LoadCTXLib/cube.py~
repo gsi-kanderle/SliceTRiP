@@ -19,7 +19,7 @@ from error import *
 from struct import *
 import numpy as np
 import array
-#import util
+import util
 
 try:
 	import dicom
@@ -131,12 +131,12 @@ class Cube(object):
 		return self.cube[indices[2]][indices[1]][indices[0]]
 	def get_value_at_pos(self,pos):
 		return self.get_value_at_indice(self.pos_to_indices(pos))
-	#def create_cube_from_equation(self,equation,center,limits,radial=True):
-		#eq = util.evaluator(equation);
-		#data = np.array(np.zeros((self.dimz,self.dimy,self.dimx)))
-		#x = np.linspace(0.5,self.dimx-0.5,self.dimx)*self.pixel_size-center[0]
-		#y = np.linspace(self.dimx-0.5,0.5,self.dimx)*self.pixel_size-center[1]
-		#xv,yv = np.meshgrid(x,y) 
+	def create_cube_from_equation(self,equation,center,limits,radial=True):
+		eq = util.evaluator(equation);
+		data = np.array(np.zeros((self.dimz,self.dimy,self.dimx)))
+		x = np.linspace(0.5,self.dimx-0.5,self.dimx)*self.pixel_size-center[0]
+		y = np.linspace(self.dimx-0.5,0.5,self.dimx)*self.pixel_size-center[1]
+		xv,yv = np.meshgrid(x,y) 
 		
 			
 			

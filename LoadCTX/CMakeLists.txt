@@ -7,6 +7,11 @@ set(MODULE_PYTHON_SCRIPTS
   ${MODULE_NAME}Lib/__init__
   ${MODULE_NAME}Lib/LoadCTXBinfo
   ${MODULE_NAME}Lib/LoadCTXImageImportFromArray
+  ${MODULE_NAME}Lib/ctx
+  ${MODULE_NAME}Lib/cube
+  ${MODULE_NAME}Lib/error
+  ${MODULE_NAME}Lib/header
+  ${MODULE_NAME}Lib/SubjectHiearchy
   )
 
 set(MODULE_PYTHON_RESOURCES
