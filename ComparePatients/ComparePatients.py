@@ -89,13 +89,14 @@ class ComparePatientsWidget:
     self.layout.addWidget(parametersCollapsibleButton)
 
     # Layout within the dummy collapsible button
-    self.parametersFormLayout = qt.QFormLayout(parametersCollapsibleButton)
+    self.parametersFormLayout = qt.QGridLayout(parametersCollapsibleButton)
     
     # Load all patients
     self.patientComboBox = qt.QComboBox()    
-    self.patientComboBox.setToolTip( "Input file" )
+    self.patientComboBox.setToolTip( "Select Patient." )
     self.patientComboBox.enabled = True
-    self.parametersFormLayout.addRow("Patient:", self.patientComboBox)
+    #self.parametersFormLayout.addWidget("Patient:", self.patientComboBox)
+    self.parametersFormLayout.addWidget(self.patientComboBox, 0 ,0)
     
     
     patientNumber = 1
@@ -124,13 +125,29 @@ class ComparePatientsWidget:
     # Selection of plan
     self.planComboBox = qt.QComboBox()
     self.planComboBox.enabled = False
-    self.parametersFormLayout.addRow("Select plan: ", self.planComboBox)
+    #self.parametersFormLayout.addWidget("Select plan: ", self.planComboBox)
+    self.parametersFormLayout.addWidget(self.planComboBox, 1 , 0)
     
     
     # Metrics list (max Dose, mean Dose...)
     self.metricComboBox = qt.QComboBox()
     self.metricComboBox.enabled = False
-    self.parametersFormLayout.addRow("Select metric to compare: ", self.metricComboBox)
+    #self.parametersFormLayout.addWidget("Select metric to compare: ", self.metricComboBox)
+    self.parametersFormLayout.addWidget(self.metricComboBox, 0 , 1)
+    
+    # Voi list
+    self.voiComboBox = qt.QComboBox()
+    self.voiComboBox.enabled = False
+    #self.parametersFormLayout.addWidget("Select Voi: ", self.voiComboBox)
+    self.parametersFormLayout.addWidget(self.voiComboBox, 1, 1)
+    
+    #
+    # Show Button
+    #
+    self.showButton = qt.QPushButton("Show VOI")
+    self.showButton.toolTip = "Run the algorithm."
+    self.showButton.enabled = True
+    self.parametersFormLayout.addWidget(self.showButton, 2, 1)
     
     #
     # Show Plan Button
@@ -138,7 +155,7 @@ class ComparePatientsWidget:
     self.showPlan = qt.QPushButton("Show Plan")
     self.showPlan.toolTip = "Loads CT and plan to Slicer."
     self.showPlan.enabled = True
-    self.parametersFormLayout.addRow(self.showPlan)
+    self.parametersFormLayout.addWidget(self.showPlan,2,0)
     
     #
     # Compare to SBRT Button
@@ -146,7 +163,14 @@ class ComparePatientsWidget:
     self.compareButton = qt.QPushButton("Show VOI Data")
     self.compareButton.toolTip = "Calculates and visualizes plan to SBRT."
     self.compareButton.enabled = False
-    self.parametersFormLayout.addRow(self.compareButton)
+    self.parametersFormLayout.addWidget(self.compareButton,3,0)
+    
+    #
+    # Export DVH
+    #
+    self.exportDVHButton = qt.QPushButton("Copy DVH to Clipboard")
+    self.exportDVHButton.enabled = True
+    self.parametersFormLayout.addWidget(self.exportDVHButton, 4 ,1)
     
     
     #
@@ -155,7 +179,7 @@ class ComparePatientsWidget:
     self.saveBestPlan = qt.QPushButton("Save Best plan")
     self.saveBestPlan.toolTip = "Save best plan to disk (can read it later)."
     self.saveBestPlan.enabled =True
-    self.parametersFormLayout.addRow(self.saveBestPlan)
+    self.parametersFormLayout.addWidget(self.saveBestPlan,4,0)
     
     #
     # Save Best Plan Button
@@ -163,52 +187,40 @@ class ComparePatientsWidget:
     self.plotDVHButton = qt.QPushButton("Plot!")
     self.plotDVHButton.toolTip = "Plot dvh."
     self.plotDVHButton.enabled =True
-    self.parametersFormLayout.addRow(self.plotDVHButton)
+    self.parametersFormLayout.addWidget(self.plotDVHButton,3,1)
     
     # Plan PTV
+    self.PTVFrom = qt.QFormLayout()
     self.PTVCheckBox = qt.QCheckBox()     
     self.PTVCheckBox.setToolTip( "Look at the plans for PTV" )
     self.PTVCheckBox.setCheckState(0)
-    self.parametersFormLayout.addRow("PTV plan:", self.PTVCheckBox)
+    self.PTVFrom.addRow("PTV plan:", self.PTVCheckBox)
+    self.parametersFormLayout.addLayout(self.PTVFrom, 5, 0)
     
     # Plan PTV
+    self.normalizeForm = qt.QFormLayout()
     self.normalizeCheckBox = qt.QCheckBox()     
     self.normalizeCheckBox.setToolTip( "Normalize dose" )
     self.normalizeCheckBox.setCheckState(0)
-    self.parametersFormLayout.addRow("Normalize:", self.normalizeCheckBox)
+    #self.parametersFormLayout.addWidget("Normalize:", self.normalizeCheckBox)
+    self.normalizeForm.addRow("Normalize:",self.normalizeCheckBox)
+    self.parametersFormLayout.addLayout(self.normalizeForm, 5, 1)
     #
     # Copy to Clipboard Button
     #
     self.toClipboardButton = qt.QPushButton("Copy values to clipboard")
     self.toClipboardButton.toolTip = "Take difference from best plan and sbrt from desired metric."
     self.toClipboardButton.enabled =True
-    self.parametersFormLayout.addRow(self.toClipboardButton)
+    self.parametersFormLayout.addWidget(self.toClipboardButton, 6, 0)
+
     
-    #
-    # Export DVH
-    #
-    self.exportDVHButton = qt.QPushButton("Copy DVH to Clipboard")
-    self.exportDVHButton.enabled = True
-    self.parametersFormLayout.addRow(self.exportDVHButton)
     
-    # Voi list
-    self.voiComboBox = qt.QComboBox()
-    self.voiComboBox.enabled = False
-    self.parametersFormLayout.addRow("Select Voi: ", self.voiComboBox)
-    
-    #
-    # Show Button
-    #
-    self.showButton = qt.QPushButton("Show VOI")
-    self.showButton.toolTip = "Run the algorithm."
-    self.showButton.enabled = True
-    self.parametersFormLayout.addRow(self.showButton)
     
     
     
     #Voi table
     self.voiTable= qt.QTableWidget()
-    self.parametersFormLayout.addRow(self.voiTable)
+    self.parametersFormLayout.addWidget(self.voiTable, 7, 0, 7, 2)
     self.voiTable.visible = False
 
     # connections
