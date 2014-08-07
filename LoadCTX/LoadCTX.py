@@ -844,15 +844,15 @@ class LoadCTXLogic:
     colorTableNode.SetNumberOfColors(256);
     colorTableNode.GetLookupTable().SetTableRange(0,255);
     for i in range(0,256):
-      if i<49:
+      if i<48:
         colorTableNode.AddColor(str(i), 0.06, 0, 1, 0.2);
-      elif i<98:
+      elif i<97:
 	colorTableNode.AddColor(str(i), 0, 0.94, 1, 0.2);
-      elif i<147:
+      elif i<145:
         colorTableNode.AddColor(str(i), 0.02, 0.5, 0, 0.2);
-      elif i<195:
+      elif i<194:
         colorTableNode.AddColor(str(i), 0.02, 1, 0, 0.2);
-      elif i<231:
+      elif i<230:
         colorTableNode.AddColor(str(i), 1, 1, 0, 0.2);
       elif i<255:
         colorTableNode.AddColor(str(i), 1, 0, 0, 0.2);
