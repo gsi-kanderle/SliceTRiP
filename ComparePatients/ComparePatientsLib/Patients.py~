@@ -146,16 +146,16 @@ def readPatientData(newPatient,planPTV=False):
 	if filePrefix.find('sbrt') > -1:
 	  #Find existing sbrt plan, otherwise create new
 	  sbrtPlan = newPatient.loadSBRTPlan()
-	  #if not sbrtPlan:
-	    #sbrtPlan = Plan()
-	    #sbrtPlan.patientFlag = newPatient.number
-	    #sbrtPlan.fileName = fileName
-	    #newPatient.add_plan(sbrtPlan)
-	  ##Read values and dvh 
-	  #if filePrefix.find('dvh') > -1:
-	    #sbrtPlan.readTxtDvhFile(filePathGD + fileName)
-	  #else:
-	    #sbrtPlan.readTxtFile(filePathGD + fileName)
+	  if not sbrtPlan:
+	    sbrtPlan = Plan()
+	    sbrtPlan.patientFlag = newPatient.number
+	    sbrtPlan.fileName = fileName
+	    newPatient.add_plan(sbrtPlan)
+	  #Read values and dvh 
+	  if filePrefix.find('dvh') > -1:
+	    sbrtPlan.readTxtDvhFile(filePathGD + fileName)
+	  else:
+	    sbrtPlan.readTxtFile(filePathGD + fileName)
 	  
 
 class Patient():
@@ -217,7 +217,9 @@ class Patient():
     for plan in self.plans:
       if plan.sbrt:
         if self.name == 'Lung021':
-	  if plan.fileName.find('_L') > -1 or plan.fileName.find('_R') > -1: 
+	  #if plan.fileName.find('_L') > -1 or plan.fileName.find('_R') > -1: 
+	    #continue
+	  if plan.fileName.find('_L') < 0:
 	    continue
         return plan
     return None

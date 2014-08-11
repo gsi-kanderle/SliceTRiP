@@ -489,7 +489,7 @@ class ComparePatientsLogic:
     for i in range(0,len(patientList)):
       newPatient = patientList[i]
       Patients.readPatientData(newPatient,planPTV)
-      if newPatient.number == 17 or newPatient.number == 21:
+      if newPatient.number == 17:
 	print "Skipping Lung0" + str(newPatient.number)
 	continue
       patientOn = True

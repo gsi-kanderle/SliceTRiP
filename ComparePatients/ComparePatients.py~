@@ -256,7 +256,7 @@ class ComparePatientsWidget:
       normalize = False
     else:
       normalize = True
-    logic.exportMetricToClipboard2(self.patientList,metric,planPTV,normalize)
+    logic.exportMetricToClipboard(self.patientList,metric,planPTV,normalize)
     
   def onCompareButton(self):
     self.voiTable.clearContents()

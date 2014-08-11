@@ -130,6 +130,8 @@ def readPatientData(newPatient,planPTV=False):
 	      newPatient.bestPlan = None
 	      twoPlans = True
         if filePrefix.find('sbrt') > -1:
+	  if newPatient.number == 21:
+	    continue
 	  #Find existing sbrt plan, otherwise create new
 	  newPlan = newPatient.loadSBRTPlan()
 	  if not newPlan:
@@ -143,6 +145,10 @@ def readPatientData(newPatient,planPTV=False):
 	    newPatient.add_plan(newPlan)
 	  newPlan.readGDFile(filePathGD + fileName)
       if fileExtension == '.txt':
+	#Patient 021 special case, we take only Left Target for now
+	if newPatient.number == 21:
+	    if filePrefix.find('_L') < 0:
+	      continue
 	if filePrefix.find('sbrt') > -1:
 	  #Find existing sbrt plan, otherwise create new
 	  sbrtPlan = newPatient.loadSBRTPlan()
@@ -217,7 +223,9 @@ class Patient():
     for plan in self.plans:
       if plan.sbrt:
         if self.name == 'Lung021':
-	  if plan.fileName.find('_L') > -1 or plan.fileName.find('_R') > -1: 
+	  #if plan.fileName.find('_L') > -1 or plan.fileName.find('_R') > -1: 
+	    #continue
+	  if plan.fileName.find('_L') < 0:
 	    continue
         return plan
     return None
