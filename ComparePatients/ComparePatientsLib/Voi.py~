@@ -133,10 +133,14 @@ class Voi():
   
   def calculateDose(self):
     
-    # If doses are to small, ignore.
-    #if self.maxDose < 1e-3:
-      #return
-      
+    # If doses are to small, set everything to zero.
+    if self.maxDose < 0.01*self.optDose:
+	self.d10 = 0
+	self.d30 = 0
+	self.d99 = 0
+	self.v24Gy = 0
+	self.calcPerscDose = 0
+        return
     self.d10 = self.setValue(10)
     #self.d10 = self.d10*dose
     self.d30 = self.setValue(30)
@@ -162,7 +166,24 @@ class Voi():
     array = abs(y-value)
     index = np.argmin(array)
     if index:
-      result = x[index]
+      #If difference between value and y is more than 1%, do linear interpolation,
+      #if index is not the last element in array
+      if abs(y[index] - value) > 1 and index < len(x)-1:
+	#Switch x and y and find if left or right value
+	if y[index] - value > 0:
+	  interp_y = [ x[index+1], x[index] ]
+	  interp_x = [ y[index+1], y[index] ]
+	else:
+	  #Special case in index-1 = 0
+	  if index-1 == 0:
+	    interp_x = [ y[index], self.maxDose ]
+	  else:
+	    interp_x = [ y[index], y[index-1] ]  
+	  interp_y = [ x[index], x[index-1] ]
+	  
+	result = np.interp(value, interp_x, interp_y)
+      else:
+        result = x[index]
       return round(result,2)
     else:
       return 0

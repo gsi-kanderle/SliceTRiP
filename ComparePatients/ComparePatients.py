@@ -213,11 +213,7 @@ class ComparePatientsWidget:
     self.toClipboardButton.enabled =True
     self.parametersFormLayout.addWidget(self.toClipboardButton, 6, 0)
 
-    
-    
-    
-    
-    
+
     #Voi table
     self.voiTable= qt.QTableWidget()
     self.parametersFormLayout.addWidget(self.voiTable, 7, 0, 7, 2)
@@ -477,6 +473,10 @@ class ComparePatientsLogic:
     output_str = ""
     output_str = 'Difference in ' + metric + '\n'
     output_str += 'Patient name\t'
+    #Look for selected patient
+    selectedPatients = []
+    patientOn = True
+    
     for voi in voiOrder:
       output_str += voi + '\t'
     #ctvOn = True
@@ -489,6 +489,10 @@ class ComparePatientsLogic:
     for i in range(0,len(patientList)):
       newPatient = patientList[i]
       Patients.readPatientData(newPatient,planPTV)
+      if newPatient.number == 17 or newPatient.number == 21:
+	print "Skipping Lung0" + str(newPatient.number)
+	continue
+      patientOn = True
       #Find out target names from pps files
       ppsFile = ppsFilePath + newPatient.name + '.pps'
       if os.path.isfile(ppsFile):
@@ -529,12 +533,16 @@ class ComparePatientsLogic:
 		else:
 		  voiContraLateral = voi
 	      if voiIpsiLateral and voiContraLateral:
+		#if getattr(voiIpsiLateral,metric) < 0 or getattr(voiContraLateral,metric) < 0:
+		  #patientOn = False
 	        output_str += str(round(getattr(voiIpsiLateral,metric)/normFactor,2)) +'\t'
 	        output_str += str(round(getattr(voiContraLateral,metric)/normFactor,2)) +'\t'
 	        voiIpsiLateral = None
 	        voiContraLateral = None
 	        firstLung = False
 	    else:
+	      if getattr(voi,metric) < -0.05:
+		patientOn = False
 	      output_str += str(round(getattr(voi,metric)/normFactor,2)) +'\t'
 	  else:
 	    output_str += '\t'
@@ -555,7 +563,129 @@ class ComparePatientsLogic:
 	  #for targetStr in targetNames:
 	    #output_str += targetStr + '\t'
 	output_str += '\n'
-	
+	if patientOn:
+	  selectedPatients.append(newPatient.name)
+      else:
+	print "Not enough data."
+      
+    print output_str
+    print selectedPatients
+    clipboard = qt.QApplication.clipboard()
+    clipboard.setText(output_str,qt.QClipboard.Selection)
+    clipboard.setText(output_str,qt.QClipboard.Clipboard)
+    
+  def exportMetricToClipboard2(self,patientList,metric,planPTV, normOn):
+    voiOrder = ["heart","spinalcord","smallerairways","esophagus","trachea",
+                "aorta","vesselslarge","airwayslarge","brachialplexus","carina",
+                "ivc","largebronchus","svc","liver","lungl","lungr"]
+
+    #voiOrder = ["ctv","gtv"]
+    #voiOrder = ["sundr"]
+    #metric = "v24Gy"
+    #File path for pps file:
+    ppsFilePath = '/u/kanderle/AIXd/Data/FC/planpars/'
+    output_str = ""
+    output_str = 'Difference in ' + metric + '\n'
+    output_str += 'Patient name\t'
+    #Look for selected patient
+    selectedPatients = []
+    
+    for voi in voiOrder:
+      output_str += voi + '\t' + voi + '\t'
+    #ctvOn = True
+    output_str += '\n'
+    maxLungDose = 0
+    #Flag for following ipsilateral lungl
+    firstLung = False
+    voiIpsiLateralSBRT = None
+    voiContraLateralSBRT = None
+    for i in range(0,len(patientList)):
+      newPatient = patientList[i]
+      Patients.readPatientData(newPatient,planPTV)
+      if newPatient.number == 17 or newPatient.number == 21:
+	print "Skipping Lung0" + str(newPatient.number)
+	continue
+      #Find out target names from pps files
+      ppsFile = ppsFilePath + newPatient.name + '.pps'
+      if os.path.isfile(ppsFile):
+	targets = self.readTargetsFromPps(ppsFile)
+      #Create voi difference for each patient - difference between best plan and sbrt
+      #print voiOrder
+      planSBRT = newPatient.loadSBRTPlan()
+      planPT = newPatient.bestPlan
+      if not planPT:
+	newPatient.loadBestPlan()
+	planPT = newPatient.bestPlan
+      if planSBRT is not None and planPT is not None:
+	Patients.findIpsiLateralLung(planSBRT)
+	output_str += newPatient.name + '\t'
+	for voiName in voiOrder:
+	  voiSBRT = planSBRT.get_voi_by_name(voiName)
+	  voiPT = planPT.get_voi_by_name(voiName)
+	  if voiSBRT and voiPT:
+	    #Normalization factor
+	    normFactor = 1
+	    if normOn:
+	      if metric == 'maxDose':
+		normFactor = voiSBRT.maxPerscDose
+	      elif metric == 'calcPerscDose':
+		normFactor = voiSBRT.perscDose
+	      else:
+		normFactor = 1	      
+	    if normFactor == 0:
+	      output_str += '\t'
+	      continue
+	    if voiName.find('lung') > -1:
+	      if voiName == 'lungl':
+	        if not voiSBRT.ipsiLateral:
+	          voiContraLateralSBRT = voiSBRT
+	          voiContraLateralPT = voiPT
+	          firstLung = True
+	        else:
+		  voiIpsiLateralSBRT = voiSBRT
+		  voiIpsiLateralPT = voiPT
+	      elif voiName == 'lungr':
+	        if firstLung:
+		  if voiSBRT.ipsiLateral:
+		    voiIpsiLateralSBRT = voiSBRT
+		    voiIpsiLateralPT = voiPT
+		  else:
+		    print "No ipsi-lateral lung"
+		    output_str += '-10\t-10\t-10\t-10\t'
+		else:
+		  voiContraLateralSBRT = voiSBRT
+		  voiContraLateralPT = voiPT
+	      if voiContraLateralSBRT and voiIpsiLateralSBRT:
+
+	        output_str += str(round(getattr(voiIpsiLateralSBRT,metric)/normFactor,2)) +'\t'
+	        output_str += str(round(getattr(voiIpsiLateralPT,metric)/normFactor,2)) +'\t'
+	        output_str += str(round(getattr(voiContraLateralSBRT,metric)/normFactor,2)) +'\t'
+	        output_str += str(round(getattr(voiContraLateralPT,metric)/normFactor,2)) +'\t'
+	        voiIpsiLateralSBRT = None
+	        voiContraLateralSBRT = None
+	        firstLung = False
+	    else:
+	      output_str += str(round(getattr(voiSBRT,metric)/normFactor,2)) +'\t'
+	      output_str += str(round(getattr(voiPT,metric)/normFactor,2)) +'\t'
+	  else:
+	    output_str += '\t' + '\t'
+	#if targets:
+	  #Patients.compareToSbrt(newPatient,targets,planPTV)
+	  #metricD99 = 'v24Gy'
+	  #targetNames = []
+	  #for targetStr in targets:
+	    #if targetStr:
+	      ##We're interested only in CTV targets
+	      #if targetStr.find('PTV') > -1 or targetStr.find('couch') > -1:
+		#continue
+	      #target = newPatient.get_voiDifference_by_name(targetStr)
+	      #if target:
+		#print "Found target: " + targetStr
+	        #output_str += str(getattr(target,metricD99)) +'\t'
+	        #targetNames.append(targetStr)
+	  #for targetStr in targetNames:
+	    #output_str += targetStr + '\t'
+	output_str += '\n'
       else:
 	print "Not enough data."
       
