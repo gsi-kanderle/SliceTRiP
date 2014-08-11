@@ -13,5 +13,5 @@ For the right color code of .dos files, you must insert the optimization value i
 
 3. TRiPDVH is a module for displaying DVH that are stored in .gd files. It also compares it to some constratints.
 
-4. CreateMovie is a module for saving screenshots. It's similar to scripted module template used in Slicer.
+4. CreateMovie is a module for saving screenshots. It's similar to scripted module template used in Slicer. It can be used to create 360 degrees pictures of 3D module in Slicer.
 
