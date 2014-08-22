@@ -33,6 +33,18 @@ class Voi():
     self.overOarDose = False
     self.ipsiLateral = False
     self.doubleArrayNode = None #Slicer double array node
+    #Display settings
+    self.N_of_motion_states=1 #Default
+    self.offsetx=0
+    self.offsety=0
+    self.offsetz=0
+    self.voi_type=''
+    self.voiNumber=0
+    self.slicerNodeID=[]
+    self.motionStateBit=[]
+    self.motionStateDescription=[]
+    
+    self.setSlicerNodeID()
 
   def readTxtDvhFile(self, content, i):
     n = len(content)
@@ -71,7 +83,17 @@ class Voi():
       print "Method: " + name + "cannot be found"
       return None
 
-    return method1 - method2
+    #Normalization
+    if 0:
+      if not method1 == 0:
+        result = (1-method2/method1)
+      elif method1 == 0 and method2 == 0:
+        result = 1
+      else:
+        result = -1
+    else:
+      result = method1 - method2
+    return result
     
     
   def readTxtFile(self,line):
@@ -285,6 +307,8 @@ class Voi():
 
       
   def setName(self,name):
+    #self.name = name
+    #return
     if name.find('PA') > -1 or name.find('Pulmonary') > -1:
       name = 'vesselslarge'
     #if name.find('.'):
@@ -292,6 +316,8 @@ class Voi():
     name = name.lower()
     if name.find("smallerairways") > -1:
 	name = "smallerairways"
+    if name.find("spinalcord") > -1:
+      name = "spinalcord"
     self.name = name
     
   def setDvhTableItems(self,horizontalHeaders):
@@ -302,3 +328,49 @@ class Voi():
       item = qt.QTableWidgetItem()
       self.dvhTableItems.append(item)
     self.calculateDose()
+    
+  #Display functions
+  def read_binfo(self,content,i):
+    line = content[i]
+    #self.name = string.join(line.split()[1:],' ')
+    if line.split()[3]=='0':
+      self.voi_type='OAR'
+    else:
+      self.voi_type='Target'
+      
+    #Residual is sometimes added as NanQ.
+    if line.split()[5] == 'NaNQ':
+       i += 1
+    else:
+      self.offsetx=float(line.split()[5])
+      self.offsety=float(line.split()[6])
+      self.offsetz=float(line.split()[7])
+    i += 1
+    while i < len(content):
+      line = content[i]
+      if re.match("descriptor",line) is not None:
+	self.N_of_motion_states += 1
+	self.motionStateBit.append(int(line.split()[3]))
+	self.motionStateDescription.append(line.split("\"")[3])
+      elif re.match("binvoi",line) is not None:
+        break
+      elif re.match("eof",line) is not None:
+        i=len(content)
+        break
+      i += 1
+    return i-1
+    
+  def setSlicerNodeID(self):
+    self.slicerNodeID = [None]*(self.N_of_motion_states+1)
+  
+  
+  #def setSlicerOrigin(self,CTdimx,CTdimy,pixel_size):
+    #slicerOffsetX = CTdimx*pixel_size-self.offsetx
+    #slicerOffSetY = CTdimy*pixel_size-self.offsety    
+    #self.slicerOriginx = slicerOffsetX
+    #self.slicerOriginy = slicerOffSetY
+    #self.slicerOriginz = self.offsetz
+    
+  def getSlicerOrigin(self):
+    slicerOrigin = [- self.offsetx, - self.offsety,self.offsetz]
+    return slicerOrigin

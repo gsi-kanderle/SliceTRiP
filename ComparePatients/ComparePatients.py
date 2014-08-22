@@ -3,6 +3,8 @@ import os
 import unittest
 from __main__ import vtk, qt, ctk, slicer
 from ComparePatientsLib import Patients, Voi
+import numpy as np
+import time
 reload(Patients)
 
 #
@@ -212,11 +214,43 @@ class ComparePatientsWidget:
     self.toClipboardButton.toolTip = "Take difference from best plan and sbrt from desired metric."
     self.toClipboardButton.enabled =True
     self.parametersFormLayout.addWidget(self.toClipboardButton, 6, 0)
+    
+    #
+    # Load voi for distance
+    #
+    self.loadVOIforDistanceButton = qt.QPushButton("Load and Prepare VOI")
+    self.loadVOIforDistanceButton.toolTip = "Load VOI and prepare it for calculation of distance."
+    self.loadVOIforDistanceButton.enabled =True
+    self.parametersFormLayout.addWidget(self.loadVOIforDistanceButton, 7, 0)
+    
+    #
+    # Compute distances
+    #
+    self.computeDistancesButton = qt.QPushButton("Compute distances")
+    self.computeDistancesButton.toolTip = "Compute distances between target and BODY contour."
+    self.computeDistancesButton.enabled =True
+    self.parametersFormLayout.addWidget(self.computeDistancesButton, 7, 1)
+    
+    # Target
+    self.targetForm = qt.QFormLayout()
+    self.targetLineEdit = qt.QLineEdit()     
+    self.targetLineEdit.setToolTip( "Target VOI" )
+    self.targetLineEdit.enabled = False
+    self.targetForm.addRow("TargetID:", self.targetLineEdit)
+    self.parametersFormLayout.addLayout(self.targetForm, 8, 0)
+    
+    # Body
+    self.bodyForm = qt.QFormLayout()
+    self.bodyLineEdit = qt.QLineEdit()     
+    self.bodyLineEdit.setToolTip( "Body VOI" )
+    self.bodyLineEdit.enabled = False
+    self.bodyForm.addRow("BodyID:", self.bodyLineEdit)
+    self.parametersFormLayout.addLayout(self.bodyForm, 8, 1)
 
 
     #Voi table
     self.voiTable= qt.QTableWidget()
-    self.parametersFormLayout.addWidget(self.voiTable, 7, 0, 7, 2)
+    self.parametersFormLayout.addWidget(self.voiTable, 9, 0, 9, 2)
     self.voiTable.visible = False
 
     # connections
@@ -228,6 +262,8 @@ class ComparePatientsWidget:
     self.patientComboBox.connect('currentIndexChanged(int)', self.setPlanComboBox)
     self.showButton.connect('clicked(bool)', self.onShowVoiButton)
     self.exportDVHButton.connect('clicked(bool)', self.onExportDVHButton)
+    self.loadVOIforDistanceButton.connect('clicked(bool)', self.onLoadVOIforDistanceButton)
+    self.computeDistancesButton.connect('clicked(bool)', self.onComputeDistancesButton)
 
     # Add vertical spacer
     self.layout.addStretch(1)
@@ -306,6 +342,15 @@ class ComparePatientsWidget:
     #logic.setTable(self.parametersFormLayout,newPatient,metricList)
 
 
+  def onLoadVOIforDistanceButton(self):
+    self.onShowVoiButton()
+    voi = self.binfo.get_voi_by_name(self.voiComboBox.currentText)
+    print voi.name.lower()
+    if voi.name.lower() == 'body':
+      self.bodyLineEdit.text = voi.slicerNodeID[0]
+    else:
+      self.targetLineEdit.text = voi.slicerNodeID[0]
+    
   def setVoiComboBox(self):
     import LoadCTXLib
     
@@ -357,6 +402,10 @@ class ComparePatientsWidget:
     patient = self.getCurrentPatient()
     patient.bestPlan = self.getCurrentPlan()
     patient.saveBestPlan()
+  
+  def onComputeDistancesButton(self):
+    logic = ComparePatientsLogic()
+    logic.computeDistances(self.targetLineEdit.text,self.bodyLineEdit.text)
   
   def setMetricComboBox(self):
     metricList = ['maxDose','calcPerscDose','meanDose','volume','d10','d30']
@@ -489,7 +538,7 @@ class ComparePatientsLogic:
     for i in range(0,len(patientList)):
       newPatient = patientList[i]
       Patients.readPatientData(newPatient,planPTV)
-      if newPatient.number == 17:
+      if newPatient.number == 17 or newPatient.number == 3:
 	print "Skipping Lung0" + str(newPatient.number)
 	continue
       patientOn = True
@@ -592,6 +641,7 @@ class ComparePatientsLogic:
     
     for voi in voiOrder:
       output_str += voi + '\t' + voi + '\t'
+      #output_str += voi + '\t'
     #ctvOn = True
     output_str += '\n'
     maxLungDose = 0
@@ -602,7 +652,7 @@ class ComparePatientsLogic:
     for i in range(0,len(patientList)):
       newPatient = patientList[i]
       Patients.readPatientData(newPatient,planPTV)
-      if newPatient.number == 17 or newPatient.number == 21:
+      if newPatient.number == 17:
 	print "Skipping Lung0" + str(newPatient.number)
 	continue
       #Find out target names from pps files
@@ -656,6 +706,8 @@ class ComparePatientsLogic:
 		  voiContraLateralSBRT = voiSBRT
 		  voiContraLateralPT = voiPT
 	      if voiContraLateralSBRT and voiIpsiLateralSBRT:
+		#output_str += str(round(getattr(voiIpsiLateralPT,metric)/getattr(voiIpsiLateralSBRT,metric),2)) +'\t'
+		#output_str += str(round(getattr(voiContraLateralPT,metric)/getattr(voiContraLateralSBRT,metric),2)) +'\t'
 
 	        output_str += str(round(getattr(voiIpsiLateralSBRT,metric)/normFactor,2)) +'\t'
 	        output_str += str(round(getattr(voiIpsiLateralPT,metric)/normFactor,2)) +'\t'
@@ -665,9 +717,11 @@ class ComparePatientsLogic:
 	        voiContraLateralSBRT = None
 	        firstLung = False
 	    else:
+	      #output_str += str(round(getattr(voiPT,metric)/getattr(voiSBRT,metric),2)) +'\t'
 	      output_str += str(round(getattr(voiSBRT,metric)/normFactor,2)) +'\t'
 	      output_str += str(round(getattr(voiPT,metric)/normFactor,2)) +'\t'
 	  else:
+	    #output_str += '\t'
 	    output_str += '\t' + '\t'
 	#if targets:
 	  #Patients.compareToSbrt(newPatient,targets,planPTV)
@@ -694,6 +748,137 @@ class ComparePatientsLogic:
     clipboard.setText(output_str,qt.QClipboard.Selection)
     clipboard.setText(output_str,qt.QClipboard.Clipboard)
     
+  def computeDistances(self,targetID,bodyID,angle):
+
+    output_str = "Test"
+    output_str += '\n'
+    
+    #Angle has to be between -180 and 180)
+    if angle < -180 or angle > 180:
+      print "Angle " + str(angle) + " not excepted."
+      return
+      
+
+    if angle == 180 or angle == -180:
+      angle = 0
+    targetNode = slicer.util.getNode(targetID)
+    targetArray = slicer.util.array(targetNode.GetID())
+    bodyNode = slicer.util.getNode(bodyID)
+    bodyArray = slicer.util.array(bodyNode.GetID())
+    
+    if not targetNode or not bodyNode:
+      print "Can't load target and body nodes."
+      return
+    targetOrigin = targetNode.GetOrigin()
+    bodyOrigin = bodyNode.GetOrigin()
+    #For one angle:
+    originDistance = abs(bodyOrigin[1] - targetOrigin[1])
+    
+    print "Origin distance " + str(originDistance)
+    print "Calculating distance between " + targetNode.GetName() + " and " + bodyNode.GetName()
+    #assume equal spacing in x&y and target&body
+    spacing = targetNode.GetSpacing()
+    originIndex = [0,0,0]
+    originIndex[0] = int(abs(bodyOrigin[0] - targetOrigin[0])/spacing[0])
+    originIndex[1] = int(abs(bodyOrigin[1] - targetOrigin[1])/spacing[1])
+    
+    dimensionsTarget = targetNode.GetImageData().GetDimensions()
+    dimensionsBody = bodyNode.GetImageData().GetDimensions()
+    #Create array for borders - surface are for target, Surface and Lower are for body
+    
+    xLimit = [0,0]
+    yLimit = [0,0]
+    angleCorrection = 0
+    itr = 1
+    if angle >= 0 and angle < 90:
+      xLimit[0] = originIndex[0]
+      xLimit[1] = dimensionsBody[0]
+      yLimit[0] = 0
+      yLimit[1] = originIndex[1] + dimensionsTarget[1]
+      angleCorrection = 0
+    elif angle >= 90 and angle < 180:
+      xLimit[0] = 0
+      xLimit[1] = originIndex[0] + dimensionsTarget[0]
+      yLimit[0] = 0
+      yLimit[1] = originIndex[1] + dimensionsTarget[1]
+      angleCorrection = 90
+    elif angle < 0 and angle >= -90:
+      angle = 360 + angle
+      xLimit[0] = originIndex[0]
+      xLimit[1] = dimensionsBody[0]
+      yLimit[1] = originIndex[1]-1
+      yLimit[0] = dimensionsBody[1]-1
+      itr = -1
+      angleCorrection = 270
+    elif angle < -90 and angle >= -180:
+      angle = 360 + angle
+      xLimit[0] = 0
+      xLimit[1] = originIndex[0] + dimensionsTarget[0]
+      yLimit[1] = originIndex[1]-1
+      yLimit[0] = dimensionsBody[1]-1
+      itr = -1
+      angleCorrection = 180
+    
+    
+    distance = np.zeros([dimensionsTarget[0],dimensionsTarget[2]])
+    
+    for z in range(0,dimensionsTarget[2]):
+      n = 0
+      surface = np.zeros(dimensionsTarget[0])
+      Surface = np.zeros(xLimit[1]-xLimit[0])
+      #Set up body surface, according to angle
+      for x in range(xLimit[0],xLimit[1]):
+	for y in xrange(yLimit[0],yLimit[1],itr):
+	   if not bodyArray[z][y][x] == 0:
+	      Surface[n] = abs(bodyOrigin[1]) + y*spacing[0]
+	      break
+        n += 1
+      #Look for surface and lower boundries of target
+      for x in range(0,dimensionsTarget[0]):
+	if angle <= 180:
+	  for y in range(0,dimensionsTarget[1]):
+	    if not targetArray[z][y][x] == 0:
+	      surface[x] = abs(targetOrigin[1]) + y*spacing[0]
+	      #print "Break at: " + str(x) + str(y) + str(z) + " with array value: " + str(targetArray[z][y][x])
+	      break
+        else:
+          for y in xrange(dimensionsTarget[1]-1,-1,-1):
+            if not targetArray[z][y][x] == 0:
+              surface[x] = abs(targetOrigin[1]) + y*spacing[0]
+              #print "Break at: " + str(x) + str(y) + str(z) + " with array value: " + str(targetArray[z][y][x])
+              break
+
+	#If there are target boundries, find voxel in body at the right angle
+	#angleDiff = np.zeros(xLimit[1]-xLimit[0])
+	angleDiffOld = 400
+	if not surface[x] == 0:
+	  #Nice angles computed seperatly
+	  if angle == 90:
+	    distance[x,z] = abs(Surface[x+originIndex[0]] - surface[x])
+	  elif angle == 270:
+            distance[x,z] = abs(Surface[x] - surface[x])
+          else:
+            print str(len(Surface)) + str(xLimit)
+	    for X in range(0,xLimit[1]-xLimit[0]):
+	      voxelAngle = (np.arctan( abs(Surface[X] - surface[x])/abs(X-x)/spacing[0]) * 180 / np.pi + angleCorrection)
+	      angleDiff = abs(angle - voxelAngle)
+	      if angleDiff < angleDiffOld and angleDiff < 2:
+	        print "Found angle: " + str(voxelAngle)
+	        distance[x] = np.sqrt((Surface[X] - surface[x])*(Surface[X] - surface[x]) + (X-x)*(X-x)/spacing[0]/spacing[0])
+	        break
+	      angleDiffOld = angleDiff
+	    #return angleDiff
+	    
+    print np.mean([np.mean([x for x in s if x]) for s in np.c_[distance]])
+    return surface
+
+      
+    print output_str
+    clipboard = qt.QApplication.clipboard()
+    clipboard.setText(output_str,qt.QClipboard.Selection)
+    clipboard.setText(output_str,qt.QClipboard.Clipboard)
+  
+  
   def visualizeComparison(self,patient,ptPlan,metric):
     
     ln = slicer.util.getNode(pattern='vtkMRMLLayoutNode*')
