@@ -19,10 +19,10 @@ class LoadCTX:
     parent.dependencies = []
     parent.contributors = ["Kristjan Anderle (GSI)"] # replace with "Firstname Lastname (Org)"
     parent.helpText = """
-    This is an example of scripted loadable module bundled in an extension.
+    This is a module for loading binfo files and setting colormap to GSI Standard for Dose.
     """
     parent.acknowledgementText = """
-    This file was originally developed by Jean-Christophe Fillion-Robin, Kitware Inc. and Steve Pieper, Isomics, Inc.  and was partially funded by NIH grant 3P41RR013218-12S1.
+    This was developed for better representation of binfo files..
 """ # replace with organization, grant and thanks.
     #parent.icon = qt.QIcon(':Icons/XLarge/SlicerDownloadMRHead.png')
     self.parent = parent
@@ -91,21 +91,21 @@ class LoadCTXWidget:
     #
     
     
-    parametersCollapsibleButton = ctk.ctkCollapsibleButton()
-    parametersCollapsibleButton.text = "Parameters"
-    self.layout.addWidget(parametersCollapsibleButton)
+    binfoCollapsibleButton = ctk.ctkCollapsibleButton()
+    binfoCollapsibleButton.text = "LoadBinfo"
+    self.layout.addWidget(binfoCollapsibleButton)
 
     # Layout within the dummy collapsible button
-    parametersFormLayout = qt.QFormLayout(parametersCollapsibleButton)
+    binfoFormLayout = qt.QFormLayout(binfoCollapsibleButton)
     #Load File
     #
     # Load CTX File Button
     #
-    self.loadButton = qt.QPushButton("Load TRiP Volume")
-    self.loadButton.toolTip = "Load TRiP File (*.ctx,*.dos,*.binfo)."
+    self.loadButton = qt.QPushButton("Load Binfo File")
+    self.loadButton.toolTip = "Load binfo file."
     self.loadButton.enabled = True
     
-    parametersFormLayout.addRow(self.loadButton)
+    binfoFormLayout.addRow(self.loadButton)
     
     #TODO: Daj opcijo, da se izbere doza in potem se zravn checkbox, zato da zberes, al ti normira na to al ne.
     # Optimized dose:
@@ -114,23 +114,14 @@ class LoadCTXWidget:
     #self.optDose.setValue(25)
     #self.optDose.setRange(0, 100)
     #self.optDose.enabled = True
-    #parametersFormLayout.addRow("Dose:", self.optDose)
+    #binfoFormLayout.addRow("Dose:", self.optDose)
    
-    
-    # Input dose value
-    # TO DO: add check box to choose between substract origin or change origin
-    self.optDoseBox = qt.QDoubleSpinBox()     
-    self.optDoseBox.setToolTip( "The optimization value for dose." )
-    self.optDoseBox.setValue(25)
-    self.optDoseBox.setRange(0, 1000)
-    parametersFormLayout.addRow("Dose optimization Value", self.optDoseBox)
-    
-    
+   
     # Binfo
     self.binfoListFile = qt.QComboBox()    
     self.binfoListFile.setToolTip( "Input file" )
     self.binfoListFile.enabled = False
-    parametersFormLayout.addRow("Binfo:", self.binfoListFile)
+    binfoFormLayout.addRow("Binfo:", self.binfoListFile)
     
 
     #self.fileName.getOpenFileName(self, tr("Open File"),"",tr("Files (*.*)"));
@@ -138,12 +129,12 @@ class LoadCTXWidget:
     # Voi list
     self.voiComboBox = qt.QComboBox()
     self.voiComboBox.enabled = False
-    parametersFormLayout.addRow("Select Voi: ", self.voiComboBox)
+    binfoFormLayout.addRow("Select Voi: ", self.voiComboBox)
     
     # Motion state list
     self.motionStateComboBox = qt.QComboBox()
     self.motionStateComboBox.enabled = False
-    parametersFormLayout.addRow("Select Motion State: ", self.motionStateComboBox)
+    binfoFormLayout.addRow("Select Motion State: ", self.motionStateComboBox)
     #motionStates=11
     #for i in range(0,motionStates+1):
       #self.motionStateComboBox.addItem(str(i))
@@ -153,58 +144,107 @@ class LoadCTXWidget:
     #
     # Show Button
     #
-    self.showButton = qt.QPushButton("Show")
+    self.showButton = qt.QPushButton("Show VOI")
     self.showButton.toolTip = "Run the algorithm."
     self.showButton.enabled = True
-    parametersFormLayout.addRow(self.showButton)
+    binfoFormLayout.addRow(self.showButton)
+    
+    doseCollapsibleButton = ctk.ctkCollapsibleButton()
+    doseCollapsibleButton.text = "ChangeDose"
+    self.layout.addWidget(doseCollapsibleButton)
+    
+    doseFormLayout = qt.QFormLayout(doseCollapsibleButton)
+    #
+    # Select dose volume
+    #
+    self.selectDose = slicer.qMRMLNodeComboBox()
+    self.selectDose.nodeTypes = ( ("vtkMRMLScalarVolumeNode"),"" )
+    #self.selectDose.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
+    #self.selectDose.selectDoseUponCreation = True
+    self.selectDose.addEnabled = False
+    self.selectDose.removeEnabled = False
+    self.selectDose.noneEnabled = True
+    self.selectDose.showHidden = False
+    self.selectDose.showChildNodeTypes = False
+    self.selectDose.setMRMLScene( slicer.mrmlScene )
+    self.selectDose.setToolTip( "Select dose volume." )
+    doseFormLayout.addRow("Dose: ", self.selectDose)
+    
+    # Input dose value
+    # TO DO: add check box to choose between substract origin or change origin
+    self.optDoseLayout = qt.QGridLayout(binfoCollapsibleButton)
+    
+    self.optDoseForm = qt.QFormLayout()
+    self.optDoseBox = qt.QDoubleSpinBox()     
+    self.optDoseBox.setToolTip( "The optimization value for dose." )
+    self.optDoseBox.setValue(25)
+    self.optDoseBox.setRange(0, 1000)
+    self.optDoseForm.addRow("Dose optimization Value", self.optDoseBox)
+    
+    self.pyhsDoseForm = qt.QFormLayout()
+    self.pyhsDoseCheckBox = qt.QCheckBox()
+    self.pyhsDoseCheckBox.setToolTip("Check if the dose volume is in permil")
+    self.pyhsDoseForm.addRow("Pyhsical dose: ", self.pyhsDoseCheckBox)
+    
+    self.optDoseLayout.addLayout(self.optDoseForm,0,0)
+    self.optDoseLayout.addLayout(self.pyhsDoseForm,0,1)
+    
+    doseFormLayout.addRow(self.optDoseLayout)
+    #
+    # Set dose colormap
+    #
+    self.setDoseColorButton = qt.QPushButton("Set colormap for dose volume")
+    self.setDoseColorButton.toolTip = "Creates default GSI Color table and sets it for input volume."
+    self.setDoseColorButton.enabled = True
+    doseFormLayout.addRow(self.setDoseColorButton)
     
     #
-    # Show Button
+    # Origins to zero Button
     #
     self.setOriginButton = qt.QPushButton("Set Origins to zero")
     self.setOriginButton.toolTip = "Set origins to zero."
     self.setOriginButton.enabled = True
-    parametersFormLayout.addRow(self.setOriginButton)
+    doseFormLayout.addRow(self.setOriginButton)
     
-    #
-    # Select SBRT dose
-    #
-    self.selectSBRTDose = slicer.qMRMLNodeComboBox()
-    self.selectSBRTDose.nodeTypes = ( ("vtkMRMLScalarVolumeNode"),"" )
-    #self.selectSBRTDose.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
-    #self.selectSBRTDose.selectSBRTDoseUponCreation = True
-    self.selectSBRTDose.addEnabled = False
-    self.selectSBRTDose.removeEnabled = False
-    self.selectSBRTDose.noneEnabled = True
-    self.selectSBRTDose.showHidden = False
-    self.selectSBRTDose.showChildNodeTypes = False
-    self.selectSBRTDose.setMRMLScene( slicer.mrmlScene )
-    self.selectSBRTDose.setToolTip( "Select SBRT dose volume." )
-    parametersFormLayout.addRow("SBRT dose: ", self.selectSBRTDose)
+    ##
+    ## Select SBRT dose
+    ##
+    #self.selectSBRTDose = slicer.qMRMLNodeComboBox()
+    #self.selectSBRTDose.nodeTypes = ( ("vtkMRMLScalarVolumeNode"),"" )
+    ##self.selectSBRTDose.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
+    ##self.selectSBRTDose.selectSBRTDoseUponCreation = True
+    #self.selectSBRTDose.addEnabled = False
+    #self.selectSBRTDose.removeEnabled = False
+    #self.selectSBRTDose.noneEnabled = True
+    #self.selectSBRTDose.showHidden = False
+    #self.selectSBRTDose.showChildNodeTypes = False
+    #self.selectSBRTDose.setMRMLScene( slicer.mrmlScene )
+    #self.selectSBRTDose.setToolTip( "Select SBRT dose volume." )
+    #doseFormLayout.addRow("SBRT dose: ", self.selectSBRTDose)
     
-    #
-    # Select PT dose
-    #
-    self.selectPTDose = slicer.qMRMLNodeComboBox()
-    self.selectPTDose.nodeTypes = ( ("vtkMRMLScalarVolumeNode"),"" )
-    #self.selectPTDose.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
-    #self.selectPTDose.selectPTDoseUponCreation = True
-    self.selectPTDose.addEnabled = False
-    self.selectPTDose.removeEnabled = False
-    self.selectPTDose.noneEnabled = True
-    self.selectPTDose.showHidden = False
-    self.selectPTDose.showChildNodeTypes = False
-    self.selectPTDose.setMRMLScene( slicer.mrmlScene )
-    self.selectPTDose.setToolTip( "Select PT dose volume." )
-    parametersFormLayout.addRow("PT dose: ", self.selectPTDose)
+    ##
+    ## Select PT dose
+    ##
+    #self.selectPTDose = slicer.qMRMLNodeComboBox()
+    #self.selectPTDose.nodeTypes = ( ("vtkMRMLScalarVolumeNode"),"" )
+    ##self.selectPTDose.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
+    ##self.selectPTDose.selectPTDoseUponCreation = True
+    #self.selectPTDose.addEnabled = False
+    #self.selectPTDose.removeEnabled = False
+    #self.selectPTDose.noneEnabled = True
+    #self.selectPTDose.showHidden = False
+    #self.selectPTDose.showChildNodeTypes = False
+    #self.selectPTDose.setMRMLScene( slicer.mrmlScene )
+    #self.selectPTDose.setToolTip( "Select PT dose volume." )
+    #doseFormLayout.addRow("PT dose: ", self.selectPTDose)
     
     #
     # Recalculate button
     #
-    self.setDoseButton = qt.QPushButton("Set Dose.")
-    self.setDoseButton.toolTip = "Takes two doses into account and calculates their difference."
-    self.setDoseButton.enabled = True
-    parametersFormLayout.addRow(self.setDoseButton)
+    #self.setDoseButton = qt.QPushButton("Set Dose.")
+    #self.setDoseButton.toolTip = "Takes two doses into account and calculates their difference."
+    #self.setDoseButton.enabled = True
+    #doseFormLayout.addRow(self.setDoseButton)
 
     # connections
     self.showButton.connect('clicked(bool)', self.onShowButton)
@@ -212,7 +252,8 @@ class LoadCTXWidget:
     self.loadButton.connect('clicked(bool)', self.onLoadButton)
     self.voiComboBox.connect('currentIndexChanged(QString)', self.setMotionStatesFromComboBox)
     self.binfoListFile.connect('currentIndexChanged(int)', self.setBinfoFile)
-    self.setDoseButton.connect('clicked(bool)', self.onSetDoseButton)
+    self.setDoseColorButton.connect('clicked(bool)', self.onSetDoseColorButton)
+    self.pyhsDoseCheckBox.connect('clicked(bool)',self.onChangePyhsDoseCheckBox)
 
 
     # Add vertical spacer
@@ -221,8 +262,6 @@ class LoadCTXWidget:
     # Binfo file:
     #binfo=Binfo()
     self.binfoList = []
-    self.ctx = None
-    self.dos = None
     self.cbt = None
     
 
@@ -237,30 +276,9 @@ class LoadCTXWidget:
     filePathList=loadFileName.getOpenFileNames()
     for filePath in filePathList:
       filePrefix, fileExtension = os.path.splitext(filePath)
-      #Check for different extensions
-      if fileExtension == ".ctx":
-	reload(LoadCTXLib)
-	fileInfo = 0
-	#if not self.ctx:
-	self.ctx = logic.loadCube(filePath,fileInfo,showOn = True)
-	#LoadCTXLib.addSeriesInHierarchy(self.ctx)
-      elif fileExtension == ".dos":
-	fileInfo = 1
-	#if filePrefix.find('phys')>-1:
-	  #optDoseValue = 1000
-	#else:
-	  #optDoseValue = self.optDoseBox.value
-	#print optDoseValue
-	optDoseValue = self.optDoseBox.value
-	#print optDoseValue
-	#return
-	#print filePrefix.find('phys')
-	#optDose = 25
-	self.dos = logic.loadCube(filePath,fileInfo,optDose = optDoseValue,showOn = True)
-      elif fileExtension == ".cbt":
+      if fileExtension == ".cbt":
 	fileInfo = 3
-	self.cbt = logic.loadCube(filePath,fileInfo,showOn = True)
-      #Binfo is special case.  
+	self.cbt = logic.loadCube(filePath,fileInfo,showOn = True) 
       elif fileExtension == ".binfo":
 	self.voiComboBox.clear()
 	self.motionStateComboBox.clear() 
@@ -328,20 +346,18 @@ class LoadCTXWidget:
     filePath = filePrefix + voi.name + ".ctx"
     logic = LoadCTXLogic()
     n=self.motionStateComboBox.currentIndex
-    voi.slicerNodeID[n]=logic.loadCube(filePath,2,motionState=n,voi=voi,ctx=self.ctx)
+    voi.slicerNodeID[n]=logic.loadCube(filePath,2,motionState=n,voi=voi,patientName = binfo.name)
       #self.confirmBox(("Loaded file: "+filePath))
 
-  def onSetDoseButton(self):
+  def onSetDoseColorButton(self):
     logic = LoadCTXLogic()
-    
-    sbrtNode = self.selectSBRTDose.currentNode()
-    ptNode = self.selectPTDose.currentNode()
-    
-    if not ptNode or not sbrtNode:
-      print "No SBRT and/or PT dose!."
+    doseNode = self.selectDose.currentNode()
+    optDoseValue = self.optDoseBox.value
+    if not doseNode:
+      print "No SBRT and/or PT dose!"
       return
       
-    logic.setDoses(sbrtNode,ptNode)
+    logic.setDose(doseNode,optDoseValue)
     
   def onSetOriginButton(self):
     nodes = slicer.util.getNodes('vtkMRMLScalarVolumeNode*')
@@ -351,7 +367,14 @@ class LoadCTXWidget:
     print "Done!"
     return
 
-    
+  def onChangePyhsDoseCheckBox(self):
+    if self.pyhsDoseCheckBox.checkState() == 0:
+      self.optDoseBox.setValue(25)
+      self.optDoseBox.enabled = True
+    else:
+      self.optDoseBox.setValue(1000)
+      self.optDoseBox.enabled = False
+  
   def onReload(self,moduleName="LoadCTX"):
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
@@ -386,7 +409,7 @@ class LoadCTXLogic:
   def __init__(self):
     pass
 
-  def loadCube(self,filePath,fileInfo,motionState=0,voi=None, ctx=None, optDose = 25, showOn = True):
+  def loadCube(self,filePath,fileInfo,motionState=0,voi=None, ctx=None, showOn = True, patientName=None):
     
     
     #Check if Slicer already has display node for voi.
@@ -401,9 +424,6 @@ class LoadCTXLogic:
           return True
         else:
 	  voi.slicerNodeID[motionState]=None
-    
-    #ul[1][1][1]
-#array([-0.04854982, -0.04737258, -0.00031896], dtype=float32)
     
     
     if not filePath or not os.path.isfile(filePath):
@@ -453,11 +473,7 @@ class LoadCTXLogic:
       TRiPCube[:,:,:,0] = np.array(pyTRiPCube.cube)*pyTRiPCube.pixel_size
       TRiPCube[:,:,:,1] = np.array(pyTRiPCube_y.cube)*pyTRiPCube.pixel_size
       TRiPCube[:,:,:,2] = np.array(pyTRiPCube_z.cube)*pyTRiPCube.slice_distance
-    
-    if fileInfo==1:
-      doseMax=int(TRiPCube.max())
-      if doseMax > optDose*2 and filePath.find('phys') > -1:
-	optDose = 1000
+   
       
     pbar.setValue(20)
 
@@ -485,14 +501,7 @@ class LoadCTXLogic:
     
     #Set vtkImageData to Slicer Volume & set all atributes    
     slicer.mrmlScene.AddNode( slicerVolume )
-    #imageData = importer.GetOutput()
-    
-    #Set origin for vois in binfo files
-    #if fileInfo == 2:
-      #if voi:
-        #imageData.SetOrigin(voi.getSlicerOrigin())
-        #slicerVolume = self.convertLabelMapToClosedSurfaceModel(imageData = imageData)
-      #else:
+
     slicerVolume.SetAndObserveImageData(importer.GetOutput())
     slicerVolume.SetSpacing(pyTRiPCube.pixel_size,pyTRiPCube.pixel_size,pyTRiPCube.slice_distance)
         #Set ijttoras matrix
@@ -503,18 +512,8 @@ class LoadCTXLogic:
     
     #slicerVolume.SetSpacing(pyTRiPCube.pixel_size,pyTRiPCube.pixel_size,pyTRiPCube.slice_distance)
     
-    
-
     pbar.setValue(70)
-      #slicerVolume.SetLabelMap(1)
 
-      #displayNode = slicerVolume.GetDisplayNode()
-      #if displayNode:
-        #colorNode = displayNode.GetColorNode()
-        #if colorNode:
-          #labelValue = colorNode.GetColorName(labelIndex)
-      #return "%s (%d)" % (labelValue, labelIndex)
-          
     #Check if name exist
     if fileInfo == 2:
       slicerName = pyTRiPCube.patient_name+"_"+str(motionState)
@@ -542,8 +541,7 @@ class LoadCTXLogic:
 		round(pyTRiPCube.yoffset*pyTRiPCube.pixel_size,1),
 		pyTRiPCube.zoffset]
       slicerVolume.SetOrigin(origin)
-      
-      
+           
     storageNode = slicerVolume.CreateDefaultStorageNode()
     slicerVolume.SetAndObserveStorageNodeID(storageNode.GetID())
 
@@ -558,8 +556,7 @@ class LoadCTXLogic:
       if displayNode:
         slicer.mrmlScene.AddNode(displayNode)
         slicerVolume.SetAndObserveDisplayNodeID(displayNode.GetID())
-        
-    
+           
     if showOn and not fileInfo == 2:
       # make the output volume appear in all the slice views
       if fileInfo>0:
@@ -568,33 +565,8 @@ class LoadCTXLogic:
         background=False
     
       self.setSliceDisplay(slicerVolume,background)
-        
-      ##Set dose values to float for normalization and calculations
-      #if pyTRiPCube.data_type=='integer' and fileInfo == 1:
-        #cliNode = self.changeScalarVolumeType(slicerVolume)
-
-      pbar.setValue(100)
-            
-      #Set color of dose volume
-      if fileInfo==1:
-        #TODO: Display doseMax on display
-        slicerVolumeDisplay=slicerVolume.GetScalarVolumeDisplayNode()
-        if slicerVolumeDisplay:
-          slicerVolumeDisplay.AutoWindowLevelOff()
-          slicerVolumeDisplay.AutoThresholdOff()
-	  #slicerVolumeDisplay.SetThreshold(doseMax*0.1,doseMax*1.1)
-	  #TODO: Tole se ne dela?
-	  colorNode = slicer.util.getNode('GSIStandard')
-	  if not colorNode:
-	    colorNode = self.CreateDefaultGSIColorTable()	    
-          slicerVolumeDisplay.SetAndObserveColorNodeID(colorNode.GetID())
-          slicerVolumeDisplay.SetWindowLevelMinMax(0,round(optDose*1.05))
-          slicerVolumeDisplay.SetThreshold(1,1200)
-          slicerVolumeDisplay.ApplyThresholdOn()
-        else:
-	  print "No display node for:"+slicerVolume.GetName()
-	  
-      if fileInfo == 2:
+                  	  
+    if fileInfo == 2:
 	#Create subject Hierarchy
         #Copied from SlicerSubjectHierarchyContourSetsPlugin
         from vtkSlicerSubjectHierarchyModuleMRML import vtkMRMLSubjectHierarchyNode
@@ -607,7 +579,7 @@ class LoadCTXLogic:
           sys.stderr.write('Unable to load vtkMRMLSubjectHierarchyNode and vtkSlicerContoursModuleLogic')
           return
         subjectNode = vtkMRMLSubjectHierarchyNode()
-        subjectNode.SetName('Patient_SubjectHierarchy')
+        subjectNode.SetName(patientName + '_SubjectHierarchy')
         subjectNode.SetLevel('Subject')
         contourSet = slicer.util.getNode('NewContourSet_SubjectHierarchy')
         if not contourSet:
@@ -628,7 +600,15 @@ class LoadCTXLogic:
 	contourNodeHierarchy.SetAssociatedNodeID(contourNode.GetID())
 	
 	#Set color
-	color = [0.5,0.5,0.5,1]
+	color = [0,0,0]
+	#CreateColors
+        colorNode = slicer.util.getNode('vtkMRMLColorTableNodeLabels')
+        #color = [0,0,0]
+        colorNode.GetScalarsToColors().GetColor(index, color)
+        print color
+        color.append(1)
+        
+	
 	colorNode = slicer.vtkMRMLColorTableNode()
 	slicer.mrmlScene.AddNode(colorNode)
 	
@@ -639,9 +619,9 @@ class LoadCTXLogic:
 	colorNode.SetNumberOfColors(2)
 	colorNode.GetLookupTable().SetTableRange(0,1)
 	
-	#color[0:2] = contourNode.GetDisplayNode().GetColor()
+	#color[0:2] = slicerVolume.GetDisplayNode().GetColor()
 	colorNode.AddColor('Background',0.0, 0.0, 0.0, 0.0)
-	colorNode.AddColor('Invalid',0.5,0.5,0.5,0.5)
+	colorNode.AddColor('Invalid',0.5,0.5,0.5,1)
 	
 	contourSet.SetNodeReferenceID('contourSetColorTableRef', colorNode.GetID() )
 	
@@ -653,74 +633,48 @@ class LoadCTXLogic:
 	
 	#lookupTable = vtk.vtkLookupTable()
 	#colorNode.SetLookupTable( lookupTable )
-        colorNode.GetLookupTable().SetTableRange(0, numberOfColors);
-        colorNode.SetColor(numberOfColors, pyTRiPCube.patient_name, color[0], color[1], color[2], color[3]);
-
-
+        colorNode.GetLookupTable().SetTableRange(0, numberOfColors)
+        colorNode.SetColor(numberOfColors, pyTRiPCube.patient_name, color[0], color[1], color[2], color[3])
+        contourNode.GetDisplayNode().SetColor(color[0:3])
+        slicer.mrmlScene.RemoveNode(slicerVolume)
 	
-	
+    
+    pbar.setValue(100)
     pbar.close()
     print "Done!"
     return slicerVolume.GetID()
 
-  def setDoses(self, sbrtNode, ptNode):
-    
-    sbrtArray = slicer.util.array(sbrtNode.GetID())
-    ptArray = slicer.util.array(ptNode.GetID())
-    
-    if not sbrtArray.shape == ptArray.shape:
-      print "Array dimensions not the same!"
-      print str(sbrtArray.shape) + " vs " + str(ptArray.shape)
+  def setDose(self, doseNode, optDose):
+    slicerVolumeDisplay=doseNode.GetScalarVolumeDisplayNode()
+    if slicerVolumeDisplay:
+      slicerVolumeDisplay.AutoWindowLevelOff()
+      slicerVolumeDisplay.AutoThresholdOff()
+      colorNode = slicer.util.getNode('GSIStandard')
+      if not colorNode:
+        colorNode = self.CreateDefaultGSIColorTable()	    
+      slicerVolumeDisplay.SetAndObserveColorNodeID(colorNode.GetID())
+      slicerVolumeDisplay.SetWindowLevelMinMax(0,round(optDose*1.05))
+      slicerVolumeDisplay.SetThreshold(1,1200)
+      slicerVolumeDisplay.ApplyThresholdOn()
+    else:
+      print "No display node for:"+doseNode.GetName()
       return
     
-    newArray = np.zeros(sbrtArray.shape)
-    dim = sbrtArray.shape
-    
-    #Iterate through array to determain low values, which are removed from display.
-    #Lengthy process
-    print "Going through array."
-    newArray = sbrtArray - ptArray
-    for z in range(0,dim[0]):
-      print "Slice: " + str(z) +"/" + str(dim[0])
-      for y in range(0,dim[1]):
-        for x in range(0,dim[2]):
-	  if abs(newArray[z][y][x]) < 0.1: #and abs(ptArray[z][y][x]) < 0.1:
-	    newArray[z][y][x] = - 500
-	  #else:
-	    #newArray[z][y][x] = sbrtArray[z][y][x] - ptArray[z][y][x]
-    
-    importer=LoadCTXLib.vtkImageImportFromArray()
-    importer.SetArray(newArray)
-    slicerVolume = slicer.vtkMRMLScalarVolumeNode()
-
-    slicerVolume.Copy(sbrtNode)
-    
-    slicer.mrmlScene.AddNode( slicerVolume )
-    slicerVolume.SetAndObserveImageData(importer.GetOutput())
-    
-    slicerName = 'DoseDifference'
-    slicerName = slicer.mrmlScene.GenerateUniqueName(slicerName)         
-    slicerVolume.SetName(slicerName)
-    
-    displayNode = slicer.vtkMRMLScalarVolumeDisplayNode()
-    slicer.mrmlScene.AddNode(displayNode)
-    slicerVolume.SetAndObserveDisplayNodeID(displayNode.GetID())
-
-    displayNode.AutoWindowLevelOff()
-    displayNode.AutoThresholdOff()
-    displayNode.SetLevel(0)
-    displayNode.SetWindow(10)
-    displayNode.SetThreshold(-24,24)
-    displayNode.ApplyThresholdOn()
-    
-    colorNode = slicer.util.getNode('ColdToHotRainbow')
-    if not colorNode:
-      print "Error, no ColdToHotRainbow node"
-      return
-      #colorNode = self.CreateDefaultHotAndColdColorTable()
-    #else:
-      #self.CorrectColorNode(colorNode)
-    displayNode.SetAndObserveColorNodeID(colorNode.GetID())
+    selectionNode = slicer.app.applicationLogic().GetSelectionNode()
+    rcn=slicer.util.getNode("vtkMRMLSliceCompositeNodeRed")
+    ycn=slicer.util.getNode("vtkMRMLSliceCompositeNodeYellow")
+    gcn=slicer.util.getNode("vtkMRMLSliceCompositeNodeGreen")
+        
+    #Link Slice Controls
+    rcn.SetLinkedControl(1)
+    ycn.SetLinkedControl(1)
+    gcn.SetLinkedControl(1)
+    rcn.SetForegroundOpacity(0.5)
+    selectionNode.SetReferenceSecondaryVolumeID(doseNode.GetID())
+    slicer.app.applicationLogic().PropagateVolumeSelection(0)     
+    layoutManager = slicer.app.layoutManager()
+    redWidget = layoutManager.sliceWidget('Red')
+    redWidget.sliceController().fitSliceToBackground()
     
     
     print "Finshed!"
@@ -861,38 +815,6 @@ class LoadCTXLogic:
     #progressBarLayout.addWidget(label)
     return progressBar
     
-  def CreateDefaultHotAndColdColorTable(self):
-    colorTableNode = slicer.vtkMRMLColorTableNode()    
-    nodeName = "HotAndCold"
-    colorTableNode.SetName(nodeName);
-    colorTableNode.SetTypeToUser();
-    colorTableNode.SetAttribute("Category", "User Generated");
-    colorTableNode.HideFromEditorsOn();
-    colorTableNode.SetNumberOfColors(256);
-    colorTableNode.GetLookupTable().SetTableRange(0,255);
-    for i in range(0,256):
-      if i<125:
-	green = i/124.
-        colorTableNode.AddColor(str(i), 0, green, 1, 1)
-      elif i<131:
-        colorTableNode.AddColor(str(i), 1, 1, 1, 1)
-      else:
-	blue = 1-i/131.
-	colorTableNode.AddColor(str(i), 1, 0, blue, 1)
-
-    slicer.mrmlScene.AddNode( colorTableNode )
-    return colorTableNode
-  
-  def CorrectColorNode(self,colorNode):
-    for i in range(0,256):
-	if i<125:
-	  green = 1-i/124.
-          colorNode.SetColor(i, 0, green, 1, 1)
-        elif i<131:
-          colorNode.SetColor(i, 0, 0, 0, 1)
-        else:
-	  green = (i-131)/124.
-	  colorNode.SetColor(i, 1, green , 0, 1)
 	
   def CreateDefaultGSIColorTable(self):
     colorTableNode = slicer.vtkMRMLColorTableNode()    
