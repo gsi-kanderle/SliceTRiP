@@ -9,7 +9,7 @@ if [ $# -lt 1 -o $# -gt 1 ];
     echo "Linux script convert TRiP98 header to nrrd";
     echo " ";
     echo "Usage:";
-    echo "$0 <.hed file or directory>";
+    echo "Parameter: <path to .hed file or directory>";
     echo " ";
     exit 1;
 fi
@@ -33,6 +33,17 @@ function convertHeader {
 		TEMPLATE=${SCRIPTDIR}/headerTmp.nrrd
 		#Read data from TRiP header
 		TYPE=$(awk '{ if($1=="data_type") { if($2=="float") {print "float"} else {print "short"}}}' ${HEADERFILE})
+		NUM_BYTES=$(awk '{ if($1=="num_bytes") { print $2}}' ${HEADERFILE})
+		if [ "$NUM_BYTES" == "4" ]
+		then
+			if [ "$TYPE" == "float" ]
+			then
+				TYPE="double"
+			elif [ "$TYPE" == "short" ]
+			then
+				TYPE="int"
+			fi
+		fi
 		ENDIAN=$(awk '{ if($1=="byte_order") { if($2=="vms") {print "little"} else {print "big"}}}' ${HEADERFILE})
 		DIMX=$(awk '{ if($1=="dimx") { print $2}}' ${HEADERFILE})
 		DIMY=$(awk '{ if($1=="dimy") { print $2}}' ${HEADERFILE})
