@@ -1,0 +1,12 @@
+NRRD0004
+type: #TYPE#
+dimension: 3
+space: left-posterior-superior
+sizes: #DIMX# #DIMY# #DIMZ#
+space directions: (#SPACINGX#,0,0) (0,#SPACINGX#,0) (0,0,#SPACINGZ#)
+kinds: domain domain domain
+endian: #ENDIAN#
+encoding: #ENCODING#
+space origin: (#ORIGINX#,#ORIGINY#,#ORIGINZ#)
+data file: ./#FILE#
+#EOL
