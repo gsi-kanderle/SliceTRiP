@@ -204,7 +204,7 @@ class TRiPDVHWidget:
       print "Wrong extension"
       return
     
-    #self.readDoseFromFilename(filePrefix)
+    self.readDoseFromFilename(filePrefix)
     patientFlag = self.readPatientFlagFromFilename(filePrefix)
     #self.dvh = None
     #self.voiTableCheckBox = []
