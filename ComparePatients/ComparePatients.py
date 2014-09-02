@@ -228,7 +228,7 @@ class ComparePatientsWidget:
     #
     self.computeDistancesButton = qt.QPushButton("Compute distances")
     self.computeDistancesButton.toolTip = "Compute distances between target and BODY contour."
-    self.computeDistancesButton.enabled =True
+    self.computeDistancesButton.enabled = False
     self.parametersFormLayout.addWidget(self.computeDistancesButton, 7, 1)
     
     # Target
@@ -292,7 +292,7 @@ class ComparePatientsWidget:
       normalize = False
     else:
       normalize = True
-    logic.exportMetricToClipboard(self.patientList,metric,planPTV,normalize)
+    logic.exportMetricToClipboard2(self.patientList,metric,planPTV,normalize)
     
   def onCompareButton(self):
     self.voiTable.clearContents()
