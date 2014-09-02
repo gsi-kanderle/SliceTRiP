@@ -473,11 +473,7 @@ class LoadCTXLogic:
       TRiPCube[:,:,:,0] = np.array(pyTRiPCube.cube)*pyTRiPCube.pixel_size
       TRiPCube[:,:,:,1] = np.array(pyTRiPCube_y.cube)*pyTRiPCube.pixel_size
       TRiPCube[:,:,:,2] = np.array(pyTRiPCube_z.cube)*pyTRiPCube.slice_distance
-    
-    if fileInfo==1:
-      doseMax=int(TRiPCube.max())
-      if doseMax > optDose*2 and filePath.find('phys') > -1:
-	optDose = 1000
+   
       
     pbar.setValue(20)
 
@@ -505,14 +501,7 @@ class LoadCTXLogic:
     
     #Set vtkImageData to Slicer Volume & set all atributes    
     slicer.mrmlScene.AddNode( slicerVolume )
-    #imageData = importer.GetOutput()
-    
-    #Set origin for vois in binfo files
-    #if fileInfo == 2:
-      #if voi:
-        #imageData.SetOrigin(voi.getSlicerOrigin())
-        #slicerVolume = self.convertLabelMapToClosedSurfaceModel(imageData = imageData)
-      #else:
+
     slicerVolume.SetAndObserveImageData(importer.GetOutput())
     slicerVolume.SetSpacing(pyTRiPCube.pixel_size,pyTRiPCube.pixel_size,pyTRiPCube.slice_distance)
         #Set ijttoras matrix
@@ -523,8 +512,6 @@ class LoadCTXLogic:
     
     #slicerVolume.SetSpacing(pyTRiPCube.pixel_size,pyTRiPCube.pixel_size,pyTRiPCube.slice_distance)
     
-    
-
     pbar.setValue(70)
 
     #Check if name exist
@@ -545,6 +532,7 @@ class LoadCTXLogic:
       else:
 	index = 0
       slicerVolume = self.convertLabelMapToClosedSurfaceModel(slicerVolume,index = index)
+      return
       #pbar.close()
       #return
       #slicerVolume.SetLabelMap(1)
@@ -554,8 +542,7 @@ class LoadCTXLogic:
 		round(pyTRiPCube.yoffset*pyTRiPCube.pixel_size,1),
 		pyTRiPCube.zoffset]
       slicerVolume.SetOrigin(origin)
-      
-      
+           
     storageNode = slicerVolume.CreateDefaultStorageNode()
     slicerVolume.SetAndObserveStorageNodeID(storageNode.GetID())
 
@@ -570,8 +557,7 @@ class LoadCTXLogic:
       if displayNode:
         slicer.mrmlScene.AddNode(displayNode)
         slicerVolume.SetAndObserveDisplayNodeID(displayNode.GetID())
-        
-    
+           
     if showOn and not fileInfo == 2:
       # make the output volume appear in all the slice views
       if fileInfo>0:

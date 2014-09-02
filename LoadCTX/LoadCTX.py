@@ -532,8 +532,9 @@ class LoadCTXLogic:
       else:
 	index = 0
       slicerVolume = self.convertLabelMapToClosedSurfaceModel(slicerVolume,index = index)
-      #pbar.close()
-      #return
+      
+      pbar.close()
+      return
       #slicerVolume.SetLabelMap(1)
       
     else:
