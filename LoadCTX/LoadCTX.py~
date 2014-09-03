@@ -560,7 +560,7 @@ class LoadCTXLogic:
         slicerVolume.SetAndObserveDisplayNodeID(displayNode.GetID())
         
     
-    if showOn:
+    if showOn and not fileInfo == 2:
       # make the output volume appear in all the slice views
       if fileInfo>0:
         background=True
@@ -572,16 +572,6 @@ class LoadCTXLogic:
       ##Set dose values to float for normalization and calculations
       #if pyTRiPCube.data_type=='integer' and fileInfo == 1:
         #cliNode = self.changeScalarVolumeType(slicerVolume)
-
-      #if fileInfo is 1:
-        ##TODO: This somehow doesn't work.
-        #volumeArray = slicer.util.array(slicerVolume.GetID())
-        #if volumeArray:
-          #print "Normalizing dose volume " + str(optDose)
-          #volumeArray[:] = volumeArray[:]*100/optDose
-          #slicerVolume.GetImageData().Modified()
-        #else:
-	  #print "Can't obtain Dose array"
 
       pbar.setValue(100)
             
@@ -686,6 +676,8 @@ class LoadCTXLogic:
     newArray = np.zeros(sbrtArray.shape)
     dim = sbrtArray.shape
     
+
+    
     #Iterate through array to determain low values, which are removed from display.
     #Lengthy process
     print "Going through array."
@@ -694,10 +686,10 @@ class LoadCTXLogic:
       print "Slice: " + str(z) +"/" + str(dim[0])
       for y in range(0,dim[1]):
         for x in range(0,dim[2]):
-	  if abs(newArray[z][y][x]) < 0.1: #and abs(ptArray[z][y][x]) < 0.1:
+	  if abs(sbrtArray[z][y][x]) < 0.01: #and abs(ptArray[z][y][x]) < 0.1:
 	    newArray[z][y][x] = - 500
-	  #else:
-	    #newArray[z][y][x] = sbrtArray[z][y][x] - ptArray[z][y][x]
+	  else:
+	    newArray[z][y][x] = sbrtArray[z][y][x] - ptArray[z][y][x]
     
     importer=LoadCTXLib.vtkImageImportFromArray()
     importer.SetArray(newArray)
@@ -719,7 +711,7 @@ class LoadCTXLogic:
     displayNode.AutoWindowLevelOff()
     displayNode.AutoThresholdOff()
     displayNode.SetLevel(0)
-    displayNode.SetWindow(10)
+    displayNode.SetWindow(30)
     displayNode.SetThreshold(-24,24)
     displayNode.ApplyThresholdOn()
     

@@ -676,6 +676,8 @@ class LoadCTXLogic:
     newArray = np.zeros(sbrtArray.shape)
     dim = sbrtArray.shape
     
+
+    
     #Iterate through array to determain low values, which are removed from display.
     #Lengthy process
     print "Going through array."
@@ -684,10 +686,10 @@ class LoadCTXLogic:
       print "Slice: " + str(z) +"/" + str(dim[0])
       for y in range(0,dim[1]):
         for x in range(0,dim[2]):
-	  if abs(newArray[z][y][x]) < 0.1: #and abs(ptArray[z][y][x]) < 0.1:
+	  if abs(sbrtArray[z][y][x]) < 0.01: #and abs(ptArray[z][y][x]) < 0.1:
 	    newArray[z][y][x] = - 500
-	  #else:
-	    #newArray[z][y][x] = sbrtArray[z][y][x] - ptArray[z][y][x]
+	  else:
+	    newArray[z][y][x] = sbrtArray[z][y][x] - ptArray[z][y][x]
     
     importer=LoadCTXLib.vtkImageImportFromArray()
     importer.SetArray(newArray)
@@ -709,7 +711,7 @@ class LoadCTXLogic:
     displayNode.AutoWindowLevelOff()
     displayNode.AutoThresholdOff()
     displayNode.SetLevel(0)
-    displayNode.SetWindow(10)
+    displayNode.SetWindow(30)
     displayNode.SetThreshold(-24,24)
     displayNode.ApplyThresholdOn()
     
@@ -725,6 +727,7 @@ class LoadCTXLogic:
     
     print "Finshed!"
    
+  
   #This code is translated from SlicerRT module Contours.
   def convertLabelMapToClosedSurfaceModel(self, labelMapNode, index=0):
     if labelMapNode is None:
