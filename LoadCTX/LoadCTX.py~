@@ -64,27 +64,27 @@ class LoadCTXWidget:
     #
     # Reload and Test area
     #
-    reloadCollapsibleButton = ctk.ctkCollapsibleButton()
-    reloadCollapsibleButton.text = "Reload && Test"
-    self.layout.addWidget(reloadCollapsibleButton)
-    reloadFormLayout = qt.QFormLayout(reloadCollapsibleButton)
+    #reloadCollapsibleButton = ctk.ctkCollapsibleButton()
+    #reloadCollapsibleButton.text = "Reload && Test"
+    #self.layout.addWidget(reloadCollapsibleButton)
+    #reloadFormLayout = qt.QFormLayout(reloadCollapsibleButton)
 
-    # reload button
-    # (use this during development, but remove it when delivering
-    #  your module to users)
-    self.reloadCTXButton = qt.QPushButton("Reload")
-    self.reloadCTXButton.toolTip = "Reload this module."
-    self.reloadCTXButton.name = "LoadCTX Reload"
-    reloadFormLayout.addWidget(self.reloadCTXButton)
-    self.reloadCTXButton.connect('clicked()', self.onReload)
+    ## reload button
+    ## (use this during development, but remove it when delivering
+    ##  your module to users)
+    #self.reloadCTXButton = qt.QPushButton("Reload")
+    #self.reloadCTXButton.toolTip = "Reload this module."
+    #self.reloadCTXButton.name = "LoadCTX Reload"
+    #reloadFormLayout.addWidget(self.reloadCTXButton)
+    #self.reloadCTXButton.connect('clicked()', self.onReload)
 
-    # reload and test button
-    # (use this during development, but remove it when delivering
-    #  your module to users)
-    self.reloadAndTestButton = qt.QPushButton("Reload and Test")
-    self.reloadAndTestButton.toolTip = "Reload this module and then run the self tests."
-    reloadFormLayout.addWidget(self.reloadAndTestButton)
-    self.reloadAndTestButton.connect('clicked()', self.onReloadAndTest)
+    ## reload and test button
+    ## (use this during development, but remove it when delivering
+    ##  your module to users)
+    #self.reloadAndTestButton = qt.QPushButton("Reload and Test")
+    #self.reloadAndTestButton.toolTip = "Reload this module and then run the self tests."
+    #reloadFormLayout.addWidget(self.reloadAndTestButton)
+    #self.reloadAndTestButton.connect('clicked()', self.onReloadAndTest)
 
     #
     # Parameters Area
@@ -157,18 +157,18 @@ class LoadCTXWidget:
     #
     # Select dose volume
     #
-    self.selectDose = slicer.qMRMLNodeComboBox()
-    self.selectDose.nodeTypes = ( ("vtkMRMLScalarVolumeNode"),"" )
-    #self.selectDose.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
-    #self.selectDose.selectDoseUponCreation = True
-    self.selectDose.addEnabled = False
-    self.selectDose.removeEnabled = False
-    self.selectDose.noneEnabled = True
-    self.selectDose.showHidden = False
-    self.selectDose.showChildNodeTypes = False
-    self.selectDose.setMRMLScene( slicer.mrmlScene )
-    self.selectDose.setToolTip( "Select dose volume." )
-    doseFormLayout.addRow("Dose: ", self.selectDose)
+    self.selectVolume = slicer.qMRMLNodeComboBox()
+    self.selectVolume.nodeTypes = ( ("vtkMRMLScalarVolumeNode"),("vtkMRMLVectorVolumeNode"),"" )
+    #self.selectVolume.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
+    #self.selectVolume.selectVolumeUponCreation = True
+    self.selectVolume.addEnabled = False
+    self.selectVolume.removeEnabled = False
+    self.selectVolume.noneEnabled = True
+    self.selectVolume.showHidden = False
+    self.selectVolume.showChildNodeTypes = False
+    self.selectVolume.setMRMLScene( slicer.mrmlScene )
+    self.selectVolume.setToolTip( "Select dose volume." )
+    doseFormLayout.addRow("Volume: ", self.selectVolume)
     
     # Input dose value
     # TO DO: add check box to choose between substract origin or change origin
@@ -195,8 +195,16 @@ class LoadCTXWidget:
     #
     self.setDoseColorButton = qt.QPushButton("Set colormap for dose volume")
     self.setDoseColorButton.toolTip = "Creates default GSI Color table and sets it for input volume."
-    self.setDoseColorButton.enabled = True
-    doseFormLayout.addRow(self.setDoseColorButton)
+    self.setDoseColorButton.enabled = False
+    self.optDoseLayout.addWidget(self.setDoseColorButton,1,0)
+    
+    #
+    # Set dose colormap
+    #
+    self.setVectorFieldButton = qt.QPushButton("Set TRiP vector field")
+    self.setVectorFieldButton.toolTip = "Multiplies vector field values with pixel spacing (historical reason in TRiP)."
+    self.setVectorFieldButton.enabled = False
+    self.optDoseLayout.addWidget(self.setVectorFieldButton,1,1)
     
     #
     # Origins to zero Button
@@ -206,46 +214,6 @@ class LoadCTXWidget:
     self.setOriginButton.enabled = True
     doseFormLayout.addRow(self.setOriginButton)
     
-    ##
-    ## Select SBRT dose
-    ##
-    #self.selectSBRTDose = slicer.qMRMLNodeComboBox()
-    #self.selectSBRTDose.nodeTypes = ( ("vtkMRMLScalarVolumeNode"),"" )
-    ##self.selectSBRTDose.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
-    ##self.selectSBRTDose.selectSBRTDoseUponCreation = True
-    #self.selectSBRTDose.addEnabled = False
-    #self.selectSBRTDose.removeEnabled = False
-    #self.selectSBRTDose.noneEnabled = True
-    #self.selectSBRTDose.showHidden = False
-    #self.selectSBRTDose.showChildNodeTypes = False
-    #self.selectSBRTDose.setMRMLScene( slicer.mrmlScene )
-    #self.selectSBRTDose.setToolTip( "Select SBRT dose volume." )
-    #doseFormLayout.addRow("SBRT dose: ", self.selectSBRTDose)
-    
-    ##
-    ## Select PT dose
-    ##
-    #self.selectPTDose = slicer.qMRMLNodeComboBox()
-    #self.selectPTDose.nodeTypes = ( ("vtkMRMLScalarVolumeNode"),"" )
-    ##self.selectPTDose.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
-    ##self.selectPTDose.selectPTDoseUponCreation = True
-    #self.selectPTDose.addEnabled = False
-    #self.selectPTDose.removeEnabled = False
-    #self.selectPTDose.noneEnabled = True
-    #self.selectPTDose.showHidden = False
-    #self.selectPTDose.showChildNodeTypes = False
-    #self.selectPTDose.setMRMLScene( slicer.mrmlScene )
-    #self.selectPTDose.setToolTip( "Select PT dose volume." )
-    #doseFormLayout.addRow("PT dose: ", self.selectPTDose)
-    
-    #
-    # Recalculate button
-    #
-    #self.setDoseButton = qt.QPushButton("Set Dose.")
-    #self.setDoseButton.toolTip = "Takes two doses into account and calculates their difference."
-    #self.setDoseButton.enabled = True
-    #doseFormLayout.addRow(self.setDoseButton)
-
     # connections
     self.showButton.connect('clicked(bool)', self.onShowButton)
     self.setOriginButton.connect('clicked(bool)', self.onSetOriginButton)
@@ -253,7 +221,9 @@ class LoadCTXWidget:
     self.voiComboBox.connect('currentIndexChanged(QString)', self.setMotionStatesFromComboBox)
     self.binfoListFile.connect('currentIndexChanged(int)', self.setBinfoFile)
     self.setDoseColorButton.connect('clicked(bool)', self.onSetDoseColorButton)
+    self.setVectorFieldButton.connect('clicked(bool)', self.onSetVectorFieldButton)
     self.pyhsDoseCheckBox.connect('clicked(bool)',self.onChangePyhsDoseCheckBox)
+    self.selectVolume.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
 
 
     # Add vertical spacer
@@ -268,17 +238,21 @@ class LoadCTXWidget:
   def cleanup(self):
     pass
 
-  #Load TRiP cube in slicer.   
-  #fileInfo is for different filetypes: 0 CTX, 1 Dose, 2 binfo, 3 cbt
+  def onSelect(self,node):
+    if node.IsA('vtkMRMLVectorVolumeNode'):
+      self.setVectorFieldButton.enabled = True
+      self.setDoseColorButton.enabled = False
+    elif node.IsA('vtkMRMLScalarVolumeNode'):
+      self.setVectorFieldButton.enabled = False
+      self.setDoseColorButton.enabled = True
+      
+  #Load Binfo in Slicer
   def onLoadButton(self): 
     logic = LoadCTXLogic()  
     loadFileName = qt.QFileDialog()
     filePathList=loadFileName.getOpenFileNames()
     for filePath in filePathList:
       filePrefix, fileExtension = os.path.splitext(filePath)
-      if fileExtension == ".cbt":
-	fileInfo = 3
-	self.cbt = logic.loadCube(filePath,fileInfo,showOn = True) 
       elif fileExtension == ".binfo":
 	self.voiComboBox.clear()
 	self.motionStateComboBox.clear() 
@@ -349,9 +323,17 @@ class LoadCTXWidget:
     voi.slicerNodeID[n]=logic.loadCube(filePath,2,motionState=n,voi=voi,patientName = binfo.name)
       #self.confirmBox(("Loaded file: "+filePath))
 
+  def onSetVectorFieldButton(self):
+    logic = LoadCTXLogic()
+    vectorNode = self.selectVolume.currentNode()
+    if not vectorNode:
+      print "No vector field."
+      return
+    logic.setVectorField(vectorNode)
+    
   def onSetDoseColorButton(self):
     logic = LoadCTXLogic()
-    doseNode = self.selectDose.currentNode()
+    doseNode = self.selectVolume.currentNode()
     optDoseValue = self.optDoseBox.value
     if not doseNode:
       print "No SBRT and/or PT dose!"
@@ -532,9 +514,9 @@ class LoadCTXLogic:
       else:
 	index = 0
       slicerVolume = self.convertLabelMapToClosedSurfaceModel(slicerVolume,index = index)
+      
+      pbar.close()
       return
-      #pbar.close()
-      #return
       #slicerVolume.SetLabelMap(1)
       
     else:
@@ -568,6 +550,8 @@ class LoadCTXLogic:
       self.setSliceDisplay(slicerVolume,background)
                   	  
     if fileInfo == 2:
+	#Pass for now
+	pass
 	#Create subject Hierarchy
         #Copied from SlicerSubjectHierarchyContourSetsPlugin
         from vtkSlicerSubjectHierarchyModuleMRML import vtkMRMLSubjectHierarchyNode
@@ -645,6 +629,14 @@ class LoadCTXLogic:
     print "Done!"
     return slicerVolume.GetID()
 
+  def setVectorField(self, vectorNode):
+    spacing = vectorNode.GetSpacing()
+    vectorArray = slicer.util.array(vectorNode.GetID())
+    for i in range(0,3):
+      vectorArray[:,:,:,i] = vectorArray[:,:,:,i] * spacing[i]
+    vectorNode.GetImageData().Modified()
+    print "Finshed!"
+    
   def setDose(self, doseNode, optDose):
     slicerVolumeDisplay=doseNode.GetScalarVolumeDisplayNode()
     if slicerVolumeDisplay:
