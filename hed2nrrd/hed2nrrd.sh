@@ -8,9 +8,8 @@ if [ $# -lt 1 -o $# -gt 1 ];
     then
     echo "Linux script convert TRiP98 header to nrrd";
     echo " ";
-    echo "Usage:";
-    echo "Parameter: <path to .hed file or directory>";
-    echo " ";
+    echo "Input <directory> to change all .hed to .nrrd or path to .hed <file>.";
+    echo "";
     exit 1;
 fi
 
@@ -21,7 +20,7 @@ function convertHeader {
 	if [[ ! $HEADERFILE =~ \.hed$ ]];
 	then
 		echo "$HEADERFILE is not a .hed file!"
-		exit 1
+		return
 	else
 		PREFIX=$(basename ${HEADERFILE%.hed})
 		DIRNAME=$(dirname ${HEADERFILE})
@@ -36,12 +35,16 @@ function convertHeader {
 		NUM_BYTES=$(awk '{ if($1=="num_bytes") { print $2}}' ${HEADERFILE})
 		if [ "$NUM_BYTES" == "4" ]
 		then
+			if [ "$TYPE" == "short" ]
+			then
+				TYPE="int"
+			fi
+		fi
+		if [ "$NUM_BYTES" == "8" ]
+		then
 			if [ "$TYPE" == "float" ]
 			then
 				TYPE="double"
-			elif [ "$TYPE" == "short" ]
-			then
-				TYPE="int"
 			fi
 		fi
 		ENDIAN=$(awk '{ if($1=="byte_order") { if($2=="vms") {print "little"} else {print "big"}}}' ${HEADERFILE})
@@ -54,6 +57,14 @@ function convertHeader {
 		SPACINGX=$(awk '{ if($1=="pixel_size") { print $2}}' ${HEADERFILE})
 		SPACINGZ=$(awk '{ if($1=="slice_distance") { print $2}}' ${HEADERFILE})
 		ENCODING="raw"
+		#Vector field specification
+		DIMENSIONS="3"
+		DIMV=""
+		SPACINGV=""
+		DOMAINV=""
+		VFILEX=""
+		VFILEY=""
+		VFILEZ=""
 		#FIND COMPLEMENTARY FILECUBE TO HEADER
 		FLIST=$(ls ${DIRNAME}/${PREFIX}*)
 		
@@ -64,30 +75,63 @@ function convertHeader {
 			then
 				EXT=${iFILE##*.}
 				PRENAME=$(basename ${iFILE%.$EXT})
-				if [ "$EXT" == "ctx" ] || [ "$EXT" == "dos" ] || [ "$EXT" == "cbt" ] || [ "$EXT" == "gz" ] || [ "$EXT" == "zip" ]
+				if [ "$EXT" == "ctx" ] || [ "$EXT" == "dos" ] || [ "$EXT" == "gz" ] || [ "$EXT" == "zip" ]
 				then
 					FILECUBE="${PRENAME}.${EXT}"
-					if [ "$EXT" == "gz" ] ||  [ "$EXT" == "gz" ]
+					if [ "$EXT" == "gz" ] ||  [ "$EXT" == "zip" ]
 					then
 						ENCODING="gzip"
-					fi				
+					fi
+					if [ ! -f ${DIRNAME}/${FILECUBE} ]
+					then
+						echo "No filecube at ${DIRNAME}/${FILECUBE}"
+						echo "Check that there is ctx/dos/cbt/zip file with the same name as header!"
+						return
+					fi
+				fi				
+				#Check for cbt vectors
+				if [ "$EXT" == "cbt" ] || [[ $PRENAME == *cbt* ]]
+				then
+					#Find out which component
+					BASEVECTORNAME=$(basename ${iFILE})
+					if [[ $BASEVECTORNAME == *_x.* ]]
+					then
+						VECTORNAME=${BASEVECTORNAME%_x.*}
+						VECTOREXT=${BASEVECTORNAME##*_x.}
+					elif [[ $BASEVECTORNAME == *_y.* ]]
+					then
+						VECTORNAME=${BASEVECTORNAME%_y.*}
+						VECTOREXT=${BASEVECTORNAME##*_y.}
+					elif [[ $BASEVECTORNAME == *_z.* ]]
+					then
+						VECTORNAME=${BASEVECTORNAME%_z.*}
+						VECTOREXT=${BASEVECTORNAME##*_z.}
+					else
+						echo "No x, y or z component in vector field file:"
+						echo "$BASEVECTORNAME"
+						return
+					fi
+					FILECUBE="LIST"
+					VFILEX="${VECTORNAME}_x.${VECTOREXT}"
+					VFILEY="${VECTORNAME}_y.${VECTOREXT}"
+					VFILEZ="${VECTORNAME}_z.${VECTOREXT}"
+					DIMENSIONS="4"
+					DIMV="3"
+					SPACINGV="none"
+					DOMAINV="vector"
 				fi
-				
 			fi
 		done
-		if [ ! -f ${DIRNAME}/${FILECUBE} ]
-		then
-			echo "No filecube at ${DIRNAME}/${FILECUBE}"
-			echo "Check that there is ctx/dos/cbt/zip file with the same name as header!"
-			return
-		fi
+		
 # 		echo "$FILECUBE is with $TYPE $ENDIAN"
 		#Change data in template
 		sed -e s/#TYPE#/${TYPE}/g -e s/#ENDIAN#/${ENDIAN}/g -e s/#FILE#/$FILECUBE/g -e s/#ENCODING#/$ENCODING/g  \
 		-e s/#DIMX#/${DIMX}/g -e s/#DIMX#/${DIMY}/g -e s/#DIMX#/${DIMZ}/g \
 		-e s/#SPACINGX#/${SPACINGX}/g -e s/#SPACINGZ#/${SPACINGZ}/g \
 		-e s/#ORIGINX#/${ORIGINX}/g -e s/#ORIGINY#/${ORIGINY}/g -e s/#ORIGINZ#/${ORIGINZ}/g \
-		-e s/#DIMX#/${DIMX}/g -e s/#DIMY#/${DIMY}/g -e s/#DIMZ#/${DIMZ}/g \
+		-e s/#DIMX#/${DIMX}/g -e s/#DIMY#/${DIMY}/g -e s/#DIMZ#/${DIMZ}/g -e s/#DIMV#/${DIMV}/g \
+		-e s/#VFILEX#/${VFILEX}/g -e s/#VFILEY#/${VFILEY}/g -e s/#VFILEZ#/${VFILEZ}/g  \
+		-e s/#DIMENSIONS#/${DIMENSIONS}/g -e s/#SPACINGV#/${SPACINGV}/g -e s/#DOMAINV#/${DOMAINV}/g \
 		${TEMPLATE} > ${newHeader}
 		echo "Converted: $HEADERFILE --> ${newHeader}"
 	fi
