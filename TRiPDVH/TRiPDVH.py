@@ -276,11 +276,13 @@ class TRiPDVHWidget:
     if index > -1:
       fileNameRest = fileName[index+2:-1]
       if fileNameRest.find('_') > -1:
-        dose = float(fileNameRest[0:fileNameRest.find('_')])
-        #dose = float(dose)
-        self.inputDose.setValue(round(dose,1))
-    
-    
+	try:
+          dose = float(fileNameRest[0:fileNameRest.find('_')])
+          #dose = float(dose)
+          self.inputDose.setValue(round(dose,1))
+        except ValueError:
+          print "Not a float"
+
   def onReload(self,moduleName="TRiPDVH"):
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
