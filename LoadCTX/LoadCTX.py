@@ -135,20 +135,24 @@ class LoadCTXWidget:
     self.motionStateComboBox = qt.QComboBox()
     self.motionStateComboBox.enabled = False
     binfoFormLayout.addRow("Select Motion State: ", self.motionStateComboBox)
-    #motionStates=11
-    #for i in range(0,motionStates+1):
-      #self.motionStateComboBox.addItem(str(i))
-    
-
-
     #
     # Show Button
     #
-    self.showButton = qt.QPushButton("Show VOI")
-    self.showButton.toolTip = "Run the algorithm."
-    self.showButton.enabled = True
-    binfoFormLayout.addRow(self.showButton)
+    self.buttonForm = qt.QGridLayout()
+    self.showLabelMapButton = qt.QPushButton("Show scalar VOI")
+    self.showLabelMapButton.enabled = False
+    self.buttonForm.addWidget(self.showLabelMapButton,0,1)
     
+    self.show3DButton = qt.QPushButton("Show 3D VOI")
+    self.show3DButton.enabled = False
+    self.buttonForm.addWidget(self.show3DButton,0,0)
+    
+    binfoFormLayout.addRow(self.buttonForm)
+    
+    
+    #
+    # Modify Volumes
+    #
     doseCollapsibleButton = ctk.ctkCollapsibleButton()
     doseCollapsibleButton.text = "ModifyVolume"
     self.layout.addWidget(doseCollapsibleButton)
@@ -215,7 +219,8 @@ class LoadCTXWidget:
     doseFormLayout.addRow(self.setOriginButton)
     
     # connections
-    self.showButton.connect('clicked(bool)', self.onShowButton)
+    self.showLabelMapButton.connect('clicked(bool)', self.onShowLabelMapButton)
+    self.show3DButton.connect('clicked(bool)', self.onShow3DButton)
     self.setOriginButton.connect('clicked(bool)', self.onSetOriginButton)
     self.loadButton.connect('clicked(bool)', self.onLoadButton)
     self.voiComboBox.connect('currentIndexChanged(QString)', self.setMotionStatesFromComboBox)
@@ -291,6 +296,8 @@ class LoadCTXWidget:
 	  
     self.voiComboBox.enabled = True
     self.motionStateComboBox.enabled = True
+    self.showLabelMapButton.enabled = True
+    self.show3DButton.enabled = True
   
   def setMotionStatesFromComboBox(self,voiName):
     binfo = self.binfoList[self.binfoListFile.currentIndex]
@@ -310,7 +317,7 @@ class LoadCTXWidget:
 
   
   #Load voi from binfo file
-  def onShowButton(self):
+  def onShowLabelMapButton(self):
     binfo=self.binfoList[self.binfoListFile.currentIndex]
     filePrefix, fileExtension = os.path.splitext(binfo.filePath)
     voi = binfo.get_voi_by_name(self.voiComboBox.currentText)
@@ -321,7 +328,18 @@ class LoadCTXWidget:
     logic = LoadCTXLogic()
     n=self.motionStateComboBox.currentIndex
     voi.slicerNodeID[n]=logic.loadVoi(filePath,motionState=n,voi=voi)
-      #self.confirmBox(("Loaded file: "+filePath))
+  #Load voi from binfo file
+  def onShow3DButton(self):
+    binfo=self.binfoList[self.binfoListFile.currentIndex]
+    filePrefix, fileExtension = os.path.splitext(binfo.filePath)
+    voi = binfo.get_voi_by_name(self.voiComboBox.currentText)
+    if not voi:
+      print "Error, voi not found."
+      return
+    filePath = filePrefix + voi.name + ".nrrd"
+    logic = LoadCTXLogic()
+    n=self.motionStateComboBox.currentIndex
+    voi.slicerNodeID[n]=logic.loadVoi(filePath,motionState=n,voi=voi,threeD = True)
 
   def onSetVectorFieldButton(self):
     logic = LoadCTXLogic()
@@ -392,7 +410,7 @@ class LoadCTXLogic:
     pass
 
   
-  def loadVoi(self,filePath,motionState=0,voi=None):
+  def loadVoi(self,filePath,motionState=0,voi=None, threeD = False):
     if voi is not None:
       if voi.slicerNodeID[motionState] is not None:
 	slicerVolume = slicer.util.getNode(voi.slicerNodeID[motionState])
@@ -426,10 +444,17 @@ class LoadCTXLogic:
       
     array[:] = ( array[:] >> voi.motionStateBit[motionState] ) & 1
     
-    displayNode = slicer.vtkMRMLScalarVolumeDisplayNode()
-    displayNode.SetAndObserveColorNodeID("vtkMRMLColorTableNodeGrey")
-    slicer.mrmlScene.AddNode(displayNode)
-    volumeNode.SetAndObserveDisplayNodeID(displayNode.GetID())
+    if threeD:
+      if voi:
+	index = voi.voiNumber
+      else:
+	index = 0
+      volumeNode = self.convertLabelMapToClosedSurfaceModel(volumeNode, index)
+    else:
+      displayNode = slicer.vtkMRMLScalarVolumeDisplayNode()
+      displayNode.SetAndObserveColorNodeID("vtkMRMLColorTableNodeGrey")
+      slicer.mrmlScene.AddNode(displayNode)
+      volumeNode.SetAndObserveDisplayNodeID(displayNode.GetID())
     
     return volumeNode.GetID()
                   	  
