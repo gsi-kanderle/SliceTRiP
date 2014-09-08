@@ -64,27 +64,27 @@ class LoadCTXWidget:
     #
     # Reload and Test area
     #
-    #reloadCollapsibleButton = ctk.ctkCollapsibleButton()
-    #reloadCollapsibleButton.text = "Reload && Test"
-    #self.layout.addWidget(reloadCollapsibleButton)
-    #reloadFormLayout = qt.QFormLayout(reloadCollapsibleButton)
+    reloadCollapsibleButton = ctk.ctkCollapsibleButton()
+    reloadCollapsibleButton.text = "Reload && Test"
+    self.layout.addWidget(reloadCollapsibleButton)
+    reloadFormLayout = qt.QFormLayout(reloadCollapsibleButton)
 
-    ## reload button
-    ## (use this during development, but remove it when delivering
-    ##  your module to users)
-    #self.reloadCTXButton = qt.QPushButton("Reload")
-    #self.reloadCTXButton.toolTip = "Reload this module."
-    #self.reloadCTXButton.name = "LoadCTX Reload"
-    #reloadFormLayout.addWidget(self.reloadCTXButton)
-    #self.reloadCTXButton.connect('clicked()', self.onReload)
+    # reload button
+    # (use this during development, but remove it when delivering
+    #  your module to users)
+    self.reloadCTXButton = qt.QPushButton("Reload")
+    self.reloadCTXButton.toolTip = "Reload this module."
+    self.reloadCTXButton.name = "LoadCTX Reload"
+    reloadFormLayout.addWidget(self.reloadCTXButton)
+    self.reloadCTXButton.connect('clicked()', self.onReload)
 
-    ## reload and test button
-    ## (use this during development, but remove it when delivering
-    ##  your module to users)
-    #self.reloadAndTestButton = qt.QPushButton("Reload and Test")
-    #self.reloadAndTestButton.toolTip = "Reload this module and then run the self tests."
-    #reloadFormLayout.addWidget(self.reloadAndTestButton)
-    #self.reloadAndTestButton.connect('clicked()', self.onReloadAndTest)
+    # reload and test button
+    # (use this during development, but remove it when delivering
+    #  your module to users)
+    self.reloadAndTestButton = qt.QPushButton("Reload and Test")
+    self.reloadAndTestButton.toolTip = "Reload this module and then run the self tests."
+    reloadFormLayout.addWidget(self.reloadAndTestButton)
+    self.reloadAndTestButton.connect('clicked()', self.onReloadAndTest)
 
     #
     # Parameters Area
@@ -253,7 +253,7 @@ class LoadCTXWidget:
     filePathList=loadFileName.getOpenFileNames()
     for filePath in filePathList:
       filePrefix, fileExtension = os.path.splitext(filePath)
-      elif fileExtension == ".binfo":
+      if fileExtension == ".binfo":
 	self.voiComboBox.clear()
 	self.motionStateComboBox.clear() 
 	binfo = LoadCTXLib.Binfo()
@@ -317,10 +317,10 @@ class LoadCTXWidget:
     if not voi:
       print "Error, voi not found."
       return
-    filePath = filePrefix + voi.name + ".ctx"
+    filePath = filePrefix + voi.name + ".nrrd"
     logic = LoadCTXLogic()
     n=self.motionStateComboBox.currentIndex
-    voi.slicerNodeID[n]=logic.loadCube(filePath,2,motionState=n,voi=voi,patientName = binfo.name)
+    voi.slicerNodeID[n]=logic.loadVoi(filePath,motionState=n,voi=voi)
       #self.confirmBox(("Loaded file: "+filePath))
 
   def onSetVectorFieldButton(self):
@@ -391,11 +391,8 @@ class LoadCTXLogic:
   def __init__(self):
     pass
 
-  def loadCube(self,filePath,fileInfo,motionState=0,voi=None, ctx=None, showOn = True, patientName=None):
-    
-    
-    #Check if Slicer already has display node for voi.
-    #TODO: Do the same for all types
+  
+  def loadVoi(self,filePath,motionState=0,voi=None):
     if voi is not None:
       if voi.slicerNodeID[motionState] is not None:
 	slicerVolume = slicer.util.getNode(voi.slicerNodeID[motionState])
@@ -403,155 +400,41 @@ class LoadCTXLogic:
 	  selectionNode = slicer.app.applicationLogic().GetSelectionNode()
           selectionNode.SetReferenceActiveVolumeID(slicerVolume.GetID())
           slicer.app.applicationLogic().PropagateVolumeSelection(0)
-          return True
+          return voi.slicerNodeID[motionState]
         else:
 	  voi.slicerNodeID[motionState]=None
-    
-    
+	  
     if not filePath or not os.path.isfile(filePath):
       print "No file!" + filePath
-      return False
-    #Find out cube type
-          
-    fileName, fileExtension = os.path.splitext(filePath)
-    
-
-    pbar = self.progressBar(("Loading file: "+filePath))
-    pbar.setValue(10)
-    pbar.show()
-    
-    #Read cube using PyTRiP
-    if fileInfo==0 or fileInfo==2:
-      pyTRiPCube=LoadCTXLib.ctx.CtxCube()
-      pyTRiPCube.read(filePath)
-    elif fileInfo==1:
-      pyTRiPCube=LoadCTXLib.ctx.CtxCube()
-      pyTRiPCube.read(filePath)
-    #Prepare three cubes for reading cbt files
-    elif fileInfo==3:
-      fileNamePrefix = fileName[0:len(fileName)-2]
-      pyTRiPCube = LoadCTXLib.ctx.CtxCube() #cube x is without index for setting dimension and name
-      pyTRiPCube_y = LoadCTXLib.ctx.CtxCube()
-      pyTRiPCube_z = LoadCTXLib.ctx.CtxCube()
-      pyTRiPCube.read(fileNamePrefix+"_x"+fileExtension)
-      pyTRiPCube_y.read(fileNamePrefix+"_y"+fileExtension)
-      pyTRiPCube_z.read(fileNamePrefix+"_z"+fileExtension)
-    else:
-      print "Unknown extension type" + str(fileExtension)
-      pbar.close()
-      return False
-    
-    
-    
-    ##Set Dimensions
-    #dim=(pyTRiPCube.dimx,pyTRiPCube.dimy,pyTRiPCube.dimz)
-    
-    if fileInfo is not 3:
-      TRiPCube=pyTRiPCube.cube
-    else:
-      # Build a 3D array containing, each point containing vector value (x, y and z direction)
-      TRiPCube = np.empty(pyTRiPCube.cube.shape + (3,),np.float32)
-      # Vector field components in cbt are divided with voxel spacing due to historical reasons. 
-      TRiPCube[:,:,:,0] = np.array(pyTRiPCube.cube)*pyTRiPCube.pixel_size
-      TRiPCube[:,:,:,1] = np.array(pyTRiPCube_y.cube)*pyTRiPCube.pixel_size
-      TRiPCube[:,:,:,2] = np.array(pyTRiPCube_z.cube)*pyTRiPCube.slice_distance
-   
+      return None
       
-    pbar.setValue(20)
-
-    #Read the transfer bit in binfo file
-    if fileInfo==2:
-      if voi is not None:
-        print "Motion state " + str(motionState) + " on bit: " + str(voi.motionStateBit[motionState])
-        TRiPCube=(TRiPCube>>voi.motionStateBit[motionState]) & 1
-      else:
-	print "Looking at reference State"
-	TRiPCube=TRiPCube & 1
-      #if voi is not None:
-	#TRiPCube = voi.voiNumber * np.array(TRiPCube)
-	  
-    pbar.setValue(50) 
+    volumesLogic = slicer.vtkSlicerVolumesLogic()
+    volumesLogic.SetMRMLScene(slicer.mrmlScene)
+    slicerVolumeName = os.path.splitext(os.path.basename(filePath))[0]
+    volumeNode = volumesLogic.AddArchetypeVolume(filePath,slicerVolumeName,0)
+    
+    volumeNode.SetOrigin(voi.getSlicerOrigin())
+    if not volumeNode:
+      print "Can't load volume " + os.path.basename(filePath)
+      return None
       
-    ##Convert numpy array to vtk data  
-    importer=LoadCTXLib.vtkImageImportFromArray()
-    if fileInfo is not 3:
-      importer.SetArray(TRiPCube)
-      slicerVolume = slicer.vtkMRMLScalarVolumeNode()
-    else:
-      importer.SetArray(TRiPCube,numComponents=3)
-      slicerVolume = slicer.vtkMRMLVectorVolumeNode()
-    
-    #Set vtkImageData to Slicer Volume & set all atributes    
-    slicer.mrmlScene.AddNode( slicerVolume )
-
-    slicerVolume.SetAndObserveImageData(importer.GetOutput())
-    slicerVolume.SetSpacing(pyTRiPCube.pixel_size,pyTRiPCube.pixel_size,pyTRiPCube.slice_distance)
-        #Set ijttoras matrix
-    matrix = vtk.vtkMatrix4x4()
-    matrix.DeepCopy((-1,0,0,0,0,-1,0,0,0,0,1,0,0,0,0,1))
-    slicerVolume.SetIJKToRASDirectionMatrix(matrix)
-    
-    
-    #slicerVolume.SetSpacing(pyTRiPCube.pixel_size,pyTRiPCube.pixel_size,pyTRiPCube.slice_distance)
-    
-    pbar.setValue(70)
-
-    #Check if name exist
-    if fileInfo == 2:
-      slicerName = pyTRiPCube.patient_name+"_"+str(motionState)
-    elif fileInfo == 3:
-      slicerName = os.path.basename( fileNamePrefix )
-    else:
-      slicerName= os.path.basename( fileName )
-    n=0    
-    slicerName = slicer.mrmlScene.GenerateUniqueName(slicerName)         
-    slicerVolume.SetName(slicerName)
-    
-    if fileInfo == 2:
-      slicerVolume.SetOrigin(voi.getSlicerOrigin())
-      if voi:
-	index = voi.voiNumber
-      else:
-	index = 0
-      slicerVolume = self.convertLabelMapToClosedSurfaceModel(slicerVolume,index = index)
+    try:
+       array = slicer.util.array(volumeNode.GetID())
+    except AttributeError:
+      import sys
+      sys.stderr.write('Cannot get array.')
       
-      pbar.close()
-      return
-      #slicerVolume.SetLabelMap(1)
-      
-    else:
-      origin = [round(pyTRiPCube.xoffset*pyTRiPCube.pixel_size,1),
-		round(pyTRiPCube.yoffset*pyTRiPCube.pixel_size,1),
-		pyTRiPCube.zoffset]
-      slicerVolume.SetOrigin(origin)
-           
-    storageNode = slicerVolume.CreateDefaultStorageNode()
-    slicerVolume.SetAndObserveStorageNodeID(storageNode.GetID())
-
-    if not slicerVolume.GetDisplayNodeID():
-      displayNode = None
-      if fileInfo == 0 or fileInfo == 1: #or fileInfo == 2:
-        displayNode = slicer.vtkMRMLScalarVolumeDisplayNode()
-        displayNode.SetAndObserveColorNodeID("vtkMRMLColorTableNodeGrey")
-      if fileInfo == 3:
-        displayNode = slicer.vtkMRMLVectorVolumeDisplayNode()
-        displayNode.SetAndObserveColorNodeID("vtkMRMLColorTableNodeGrey")
-      if displayNode:
-        slicer.mrmlScene.AddNode(displayNode)
-        slicerVolume.SetAndObserveDisplayNodeID(displayNode.GetID())
-           
-    if showOn and not fileInfo == 2:
-      # make the output volume appear in all the slice views
-      if fileInfo>0:
-        background=True
-      else:
-        background=False
+    array[:] = ( array[:] >> voi.motionStateBit[motionState] ) & 1
     
-      self.setSliceDisplay(slicerVolume,background)
+    displayNode = slicer.vtkMRMLScalarVolumeDisplayNode()
+    displayNode.SetAndObserveColorNodeID("vtkMRMLColorTableNodeGrey")
+    slicer.mrmlScene.AddNode(displayNode)
+    volumeNode.SetAndObserveDisplayNodeID(displayNode.GetID())
+    
+    return volumeNode.GetID()
                   	  
-    if fileInfo == 2:
-	#Pass for now
-	pass
+    if 0:
+	#This Logic need some work
 	#Create subject Hierarchy
         #Copied from SlicerSubjectHierarchyContourSetsPlugin
         from vtkSlicerSubjectHierarchyModuleMRML import vtkMRMLSubjectHierarchyNode
@@ -671,7 +554,7 @@ class LoadCTXLogic:
     
     
     print "Finshed!"
-   
+
   #This code is translated from SlicerRT module Contours.
   def convertLabelMapToClosedSurfaceModel(self, labelMapNode, index=0):
     if labelMapNode is None:
@@ -753,61 +636,12 @@ class LoadCTXLogic:
     contourNode.SetName(labelMapNode.GetName())
     contourNode.SetAndObserveDisplayNodeID(contourDisplayNode.GetID())
     contourNode.SetAndObservePolyData(transformFilter.GetOutput())
-    
-    
-    
+
     slicer.mrmlScene.RemoveNode(labelMapNode)
     
     return contourNode
  
  
- 
- #Set image in foreground / background
-  def setSliceDisplay(self,node,background=False):
-      selectionNode = slicer.app.applicationLogic().GetSelectionNode()
-      rcn=slicer.util.getNode("vtkMRMLSliceCompositeNodeRed")
-      ycn=slicer.util.getNode("vtkMRMLSliceCompositeNodeYellow")
-      gcn=slicer.util.getNode("vtkMRMLSliceCompositeNodeGreen")
-        
-      ##Link Slice Controls
-      rcn.SetLinkedControl(1);
-      ycn.SetLinkedControl(1);
-      gcn.SetLinkedControl(1);
-      rcn.SetForegroundOpacity(0.5);
-	
-      if background:
-	selectionNode.SetReferenceSecondaryVolumeID(node.GetID())
-      else:
-        selectionNode.SetReferenceActiveVolumeID(node.GetID())        
-      
-      slicer.app.applicationLogic().PropagateVolumeSelection(0)     
-      layoutManager = slicer.app.layoutManager()
-      redWidget = layoutManager.sliceWidget('Red')
-      redWidget.sliceController().fitSliceToBackground()
-      
-  #Change type of scalar volume
-  def changeScalarVolumeType(self,volumeNode,volumeScalarType = ''):
-    parameters = {}
-    parameters["InputVolume"] = volumeNode.GetID()
-    parameters["OutputVolume"] = volumeNode.GetID()
-    parameters["Type"] = volumeScalarType
-    castScalarVolume = slicer.modules.castscalarvolume
-    return (slicer.cli.run(castScalarVolume, None, parameters,wait_for_completion=True))
-      
-      
-  def progressBar(self,message):
-
-    progressBar = qt.QProgressDialog(slicer.util.mainWindow())
-    progressBar.setModal(True)
-    progressBar.setMinimumDuration(150)
-    progressBar.setLabelText(message)
-    qt.QApplication.processEvents()
-    #progressBarLayout = qt.QVBoxLayout()
-    #progressBar.setLayout(progressBarLayout)
-    #label = qt.QLabel(message,progressBar)
-    #progressBarLayout.addWidget(label)
-    return progressBar
-    
 	
   def CreateDefaultGSIColorTable(self):
     colorTableNode = slicer.vtkMRMLColorTableNode()    
@@ -833,22 +667,6 @@ class LoadCTXLogic:
         colorTableNode.AddColor(str(i), 1, 0, 0, 0.2)
       else:
 	colorTableNode.AddColor(str(i), 1, 0, 1, 1)
-    #for i in range(0,256):
-      #if i<49:
-        #colorTableNode.AddColor(str(i), 0.06, 0, 1, 0.2);
-      #elif i<98:
-	#colorTableNode.AddColor(str(i), 0, 0.94, 1, 0.2);
-      #elif i<147:
-        #colorTableNode.AddColor(str(i), 0.02, 0.5, 0, 0.2);
-      #elif i<195:
-        #colorTableNode.AddColor(str(i), 0.02, 1, 0, 0.2);
-      #elif i<243:
-        #colorTableNode.AddColor(str(i), 1, 1, 0, 0.2);
-      #elif i<255:
-        #colorTableNode.AddColor(str(i), 1, 0, 0, 0.2);
-      #else:
-	#colorTableNode.AddColor(str(i), 1, 0, 1, 1);
-
     slicer.mrmlScene.AddNode( colorTableNode )
     return colorTableNode
   

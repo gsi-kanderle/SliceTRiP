@@ -64,27 +64,27 @@ class LoadCTXWidget:
     #
     # Reload and Test area
     #
-    #reloadCollapsibleButton = ctk.ctkCollapsibleButton()
-    #reloadCollapsibleButton.text = "Reload && Test"
-    #self.layout.addWidget(reloadCollapsibleButton)
-    #reloadFormLayout = qt.QFormLayout(reloadCollapsibleButton)
+    reloadCollapsibleButton = ctk.ctkCollapsibleButton()
+    reloadCollapsibleButton.text = "Reload && Test"
+    self.layout.addWidget(reloadCollapsibleButton)
+    reloadFormLayout = qt.QFormLayout(reloadCollapsibleButton)
 
-    ## reload button
-    ## (use this during development, but remove it when delivering
-    ##  your module to users)
-    #self.reloadCTXButton = qt.QPushButton("Reload")
-    #self.reloadCTXButton.toolTip = "Reload this module."
-    #self.reloadCTXButton.name = "LoadCTX Reload"
-    #reloadFormLayout.addWidget(self.reloadCTXButton)
-    #self.reloadCTXButton.connect('clicked()', self.onReload)
+    # reload button
+    # (use this during development, but remove it when delivering
+    #  your module to users)
+    self.reloadCTXButton = qt.QPushButton("Reload")
+    self.reloadCTXButton.toolTip = "Reload this module."
+    self.reloadCTXButton.name = "LoadCTX Reload"
+    reloadFormLayout.addWidget(self.reloadCTXButton)
+    self.reloadCTXButton.connect('clicked()', self.onReload)
 
-    ## reload and test button
-    ## (use this during development, but remove it when delivering
-    ##  your module to users)
-    #self.reloadAndTestButton = qt.QPushButton("Reload and Test")
-    #self.reloadAndTestButton.toolTip = "Reload this module and then run the self tests."
-    #reloadFormLayout.addWidget(self.reloadAndTestButton)
-    #self.reloadAndTestButton.connect('clicked()', self.onReloadAndTest)
+    # reload and test button
+    # (use this during development, but remove it when delivering
+    #  your module to users)
+    self.reloadAndTestButton = qt.QPushButton("Reload and Test")
+    self.reloadAndTestButton.toolTip = "Reload this module and then run the self tests."
+    reloadFormLayout.addWidget(self.reloadAndTestButton)
+    self.reloadAndTestButton.connect('clicked()', self.onReloadAndTest)
 
     #
     # Parameters Area
@@ -150,7 +150,7 @@ class LoadCTXWidget:
     binfoFormLayout.addRow(self.showButton)
     
     doseCollapsibleButton = ctk.ctkCollapsibleButton()
-    doseCollapsibleButton.text = "ChangeDose"
+    doseCollapsibleButton.text = "ModifyVolume"
     self.layout.addWidget(doseCollapsibleButton)
     
     doseFormLayout = qt.QFormLayout(doseCollapsibleButton)
@@ -253,7 +253,7 @@ class LoadCTXWidget:
     filePathList=loadFileName.getOpenFileNames()
     for filePath in filePathList:
       filePrefix, fileExtension = os.path.splitext(filePath)
-      elif fileExtension == ".binfo":
+      if fileExtension == ".binfo":
 	self.voiComboBox.clear()
 	self.motionStateComboBox.clear() 
 	binfo = LoadCTXLib.Binfo()
@@ -317,10 +317,10 @@ class LoadCTXWidget:
     if not voi:
       print "Error, voi not found."
       return
-    filePath = filePrefix + voi.name + ".ctx"
+    filePath = filePrefix + voi.name + ".nrrd"
     logic = LoadCTXLogic()
     n=self.motionStateComboBox.currentIndex
-    voi.slicerNodeID[n]=logic.loadCube(filePath,2,motionState=n,voi=voi,patientName = binfo.name)
+    voi.slicerNodeID[n]=logic.loadVoi(filePath,motionState=n,voi=voi)
       #self.confirmBox(("Loaded file: "+filePath))
 
   def onSetVectorFieldButton(self):
@@ -390,6 +390,48 @@ class LoadCTXLogic:
   """
   def __init__(self):
     pass
+
+  
+  def loadVoi(self,filePath,motionState=0,voi=None):
+    if voi is not None:
+      if voi.slicerNodeID[motionState] is not None:
+	slicerVolume = slicer.util.getNode(voi.slicerNodeID[motionState])
+	if slicerVolume is not None:
+	  selectionNode = slicer.app.applicationLogic().GetSelectionNode()
+          selectionNode.SetReferenceActiveVolumeID(slicerVolume.GetID())
+          slicer.app.applicationLogic().PropagateVolumeSelection(0)
+          return voi.slicerNodeID[motionState]
+        else:
+	  voi.slicerNodeID[motionState]=None
+	  
+    if not filePath or not os.path.isfile(filePath):
+      print "No file!" + filePath
+      return None
+      
+    volumesLogic = slicer.vtkSlicerVolumesLogic()
+    volumesLogic.SetMRMLScene(slicer.mrmlScene)
+    slicerVolumeName = os.path.splitext(os.path.basename(filePath))[0]
+    volumeNode = volumesLogic.AddArchetypeVolume(filePath,slicerVolumeName,0)
+    
+    volumeNode.SetOrigin(voi.getSlicerOrigin())
+    if not volumeNode:
+      print "Can't load volume " + os.path.basename(filePath)
+      return None
+      
+    try:
+       array = slicer.util.array(volumeNode.GetID())
+    except AttributeError:
+      import sys
+      sys.stderr.write('Cannot get array.')
+      
+    array[:] = ( array[:] >> voi.motionStateBit[motionState] ) & 1
+    
+    displayNode = slicer.vtkMRMLScalarVolumeDisplayNode()
+    displayNode.SetAndObserveColorNodeID("vtkMRMLColorTableNodeGrey")
+    slicer.mrmlScene.AddNode(displayNode)
+    volumeNode.SetAndObserveDisplayNodeID(displayNode.GetID())
+    
+    return volumeNode.GetID()
 
   def loadCube(self,filePath,fileInfo,motionState=0,voi=None, ctx=None, showOn = True, patientName=None):
     
