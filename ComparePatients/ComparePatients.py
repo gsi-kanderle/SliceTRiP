@@ -292,7 +292,7 @@ class ComparePatientsWidget:
       normalize = False
     else:
       normalize = True
-    logic.exportMetricToClipboard(self.patientList,metric,planPTV,normalize)
+    logic.exportMetricToClipboard2(self.patientList,metric,planPTV,normalize)
     
   def onCompareButton(self):
     self.voiTable.clearContents()
@@ -595,22 +595,34 @@ class ComparePatientsLogic:
 	      output_str += str(round(getattr(voi,metric)/normFactor,2)) +'\t'
 	  else:
 	    output_str += '\t'
-	#if targets:
+	if targets:
 	  #Patients.compareToSbrt(newPatient,targets,planPTV)
-	  #metricD99 = 'v24Gy'
-	  #targetNames = []
-	  #for targetStr in targets:
-	    #if targetStr:
-	      ##We're interested only in CTV targets
-	      #if targetStr.find('PTV') > -1 or targetStr.find('couch') > -1:
-		#continue
-	      #target = newPatient.get_voiDifference_by_name(targetStr)
-	      #if target:
-		#print "Found target: " + targetStr
-	        #output_str += str(getattr(target,metricD99)) +'\t'
-	        #targetNames.append(targetStr)
-	  #for targetStr in targetNames:
-	    #output_str += targetStr + '\t'
+	  metricD99 = 'v24Gy'
+	  targetNames = []
+	  planSBRT = newPatient.loadSBRTPlan()
+	  planPT = newPatient.bestPlan
+	  if not planPT:
+	    newPatient.loadBestPlan()
+	    planPT = newPatient.bestPlan
+          
+          if planSBRT is None and planPT is None:
+	    print "Can't load SBRT and/or PT plans."
+	    output_str += '\n'
+	    continue
+	  for targetStr in targets:
+	    if targetStr:
+	      #We're interested only in CTV targets
+	      if targetStr.find('PTV') > -1 or targetStr.find('couch') > -1:
+		continue
+	      targetSBRT = planSBRT.get_voi_by_name(targetStr)
+	      targetPT = planPT.get_voi_by_name(targetStr)
+	      if targetSBRT and targetPT:
+		print "Found target: " + targetStr
+	        output_str += str(getattr(targetSBRT,metricD99)) +'\t'
+	        output_str += str(getattr(targetPT,metricD99)) +'\t'
+	        targetNames.append(targetStr)
+	  for targetStr in targetNames:
+	    output_str += targetStr + '\t'
 	output_str += '\n'
 	if patientOn:
 	  selectedPatients.append(newPatient.name)
@@ -651,6 +663,8 @@ class ComparePatientsLogic:
     voiContraLateralSBRT = None
     for i in range(0,len(patientList)):
       newPatient = patientList[i]
+      if newPatient.number is not 13:
+	continue
       Patients.readPatientData(newPatient,planPTV)
       if newPatient.number == 17:
 	print "Skipping Lung0" + str(newPatient.number)

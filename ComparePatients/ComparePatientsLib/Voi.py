@@ -314,7 +314,7 @@ class Voi():
     #if name.find('.'):
       #name = name.replace(".","")
     name = name.lower()
-    if name.find("smallerairways") > -1:
+    if name.find("smallerairways") > -1 or name.find("airwayssmall") > -1:
 	name = "smallerairways"
     if name.find("spinalcord") > -1:
       name = "spinalcord"

@@ -420,22 +420,22 @@ class Plan():
     if filePrefix.find('PTV') > -1:
       self.targetPTV = True
       
-    if filePrefix.find('binrem') > -1:
-      self.binRemove = True
+    #if filePrefix.find('binrem') > -1:
+      #self.binRemove = True
       
-    find = filePrefix.find('oar')
-    if find > -1:
-      self.oarSet = True
-      filePrefixRest = filePrefix[find:]
-      find2 = filePrefixRest.find('_')
-      find3 = filePrefixRest.find('.dvh')
-      if find2 > -1:
-	self.oarMaxDoseFraction = float(filePrefixRest[3:find2-1])	
-      if find3 > -1:
-	if find2+1 == find3-1:
-	  self.oarWeigth = float(filePrefixRest[find2+1])
-	else:
-	  self.oarWeigth = float(filePrefixRest[find2+1:find3-1])
+    #find = filePrefix.find('oar')
+    #if find > -1:
+      #self.oarSet = True
+      #filePrefixRest = filePrefix[find:]
+      #find2 = filePrefixRest.find('_')
+      #find3 = filePrefixRest.find('.dvh')
+      #if find2 > -1:
+	#self.oarMaxDoseFraction = float(filePrefixRest[3:find2-1])	
+      #if find3 > -1:
+	#if find2+1 == find3-1:
+	  #self.oarWeigth = float(filePrefixRest[find2+1])
+	#else:
+	  #self.oarWeigth = float(filePrefixRest[find2+1:find3-1])
 	  
   
   def readGDFile(self,filePath):

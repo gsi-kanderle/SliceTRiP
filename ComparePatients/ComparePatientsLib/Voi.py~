@@ -307,8 +307,8 @@ class Voi():
 
       
   def setName(self,name):
-    self.name = name
-    return
+    #self.name = name
+    #return
     if name.find('PA') > -1 or name.find('Pulmonary') > -1:
       name = 'vesselslarge'
     #if name.find('.'):
