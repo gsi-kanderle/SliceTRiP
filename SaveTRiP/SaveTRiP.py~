@@ -405,12 +405,15 @@ class SaveTRiPLogic:
         #matrix.DeepCopy((-1,0,0,0,0,-1,0,0,0,0,1,0,0,0,0,1))
         vectorVolume.SetIJKToRASDirectionMatrix(matrix)
         
+
+        
         if not resample == []:
 	  newVectorVolume = self.resampleVectorVolume(vectorVolume,resample)
 	  slicer.mrmlScene.RemoveNode(vectorVolume)
 	  vectorVolume = newVectorVolume
         
 	node = vectorVolume
+	return node
 
 
       pytripCube = self.getPyTRiPCubeFromNode(node)
@@ -512,15 +515,17 @@ class SaveTRiPLogic:
       newVectorVolume.SetName(oldVectorVolume.GetName())
       slicer.mrmlScene.AddNode(newVectorVolume)
       
+      newStorageNode = newVectorVolume.CreateDefaultStorageNode()
+      newVectorVolume.SetAndObserveStorageNodeID(newStorageNode.GetID())
+      
       #Create strings for resampling
       spacing = ''
       size = ''
-      resample = [2,2,1]
-      for i in range(0,len(self.resample)):
-        spacing += str(oldVectorVolume.GetSpacing()[i]*self.resample[i])
+      for i in range(0,len(resample)):
+        spacing += str(oldVectorVolume.GetSpacing()[i]*resample[i])
         #extent = oldVectorVolume.GetImageData().GetExtent[2*i+1]
         extent = oldVectorVolume.GetImageData().GetExtent()[2*i+1]+1
-        size += str(extent/self.resample[i])
+        size += str(extent/resample[i])
         if i < 2:
 	  spacing += ','
 	  size += ','
