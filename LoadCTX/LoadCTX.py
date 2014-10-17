@@ -549,7 +549,7 @@ class LoadCTXLogic:
 
     if not slicerVolume.GetDisplayNodeID():
       displayNode = None
-      if fileInfo == 0 or fileInfo == 1: #or fileInfo == 2:
+      if fileInfo == 0 or fileInfo == 1:# or fileInfo == 2:
         displayNode = slicer.vtkMRMLScalarVolumeDisplayNode()
         displayNode.SetAndObserveColorNodeID("vtkMRMLColorTableNodeGrey")
       if fileInfo == 3:
@@ -596,16 +596,16 @@ class LoadCTXLogic:
 	  
       if fileInfo == 2:
 	#Create subject Hierarchy
-        #Copied from SlicerSubjectHierarchyContourSetsPlugin
-        from vtkSlicerSubjectHierarchyModuleMRML import vtkMRMLSubjectHierarchyNode
-        from vtkSlicerContoursModuleLogic import vtkSlicerContoursModuleLogic
-        try:
-          vtkMRMLSubjectHierarchyNode
-          vtkSlicerContoursModuleLogic
-        except AttributeError:
-          import sys
-          sys.stderr.write('Unable to load vtkMRMLSubjectHierarchyNode and vtkSlicerContoursModuleLogic')
-          return
+        ##Copied from SlicerSubjectHierarchyContourSetsPlugin
+        ##from vtkSlicerSubjectHierarchyModuleMRML import vtkMRMLSubjectHierarchyNode
+        #from vtkSlicerContoursModuleLogic import vtkSlicerContoursModuleLogic
+        #try:
+          #vtkMRMLSubjectHierarchyNode
+          #vtkSlicerContoursModuleLogic
+        #except AttributeError:
+          #import sys
+          #sys.stderr.write('Unable to load vtkMRMLSubjectHierarchyNode and vtkSlicerContoursModuleLogic')
+          #return
         subjectNode = vtkMRMLSubjectHierarchyNode()
         subjectNode.SetName('Patient_SubjectHierarchy')
         subjectNode.SetLevel('Subject')

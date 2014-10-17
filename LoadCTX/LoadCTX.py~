@@ -549,7 +549,7 @@ class LoadCTXLogic:
 
     if not slicerVolume.GetDisplayNodeID():
       displayNode = None
-      if fileInfo == 0 or fileInfo == 1: #or fileInfo == 2:
+      if fileInfo == 0 or fileInfo == 1:# or fileInfo == 2:
         displayNode = slicer.vtkMRMLScalarVolumeDisplayNode()
         displayNode.SetAndObserveColorNodeID("vtkMRMLColorTableNodeGrey")
       if fileInfo == 3:
@@ -727,6 +727,7 @@ class LoadCTXLogic:
     
     print "Finshed!"
    
+  
   #This code is translated from SlicerRT module Contours.
   def convertLabelMapToClosedSurfaceModel(self, labelMapNode, index=0):
     if labelMapNode is None:
