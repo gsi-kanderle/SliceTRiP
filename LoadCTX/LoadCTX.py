@@ -154,7 +154,7 @@ class LoadCTXWidget:
     # Modify Volumes
     #
     doseCollapsibleButton = ctk.ctkCollapsibleButton()
-    doseCollapsibleButton.text = "ModifyVolume"
+    doseCollapsibleButton.text = "Modify Volume"
     self.layout.addWidget(doseCollapsibleButton)
     
     doseFormLayout = qt.QFormLayout(doseCollapsibleButton)
@@ -218,6 +218,52 @@ class LoadCTXWidget:
     self.setOriginButton.enabled = True
     doseFormLayout.addRow(self.setOriginButton)
     
+    #
+    # Modify Volumes
+    #
+    doseDifferenceButton = ctk.ctkCollapsibleButton()
+    doseDifferenceButton.text = "Dose difference"
+    self.layout.addWidget(doseDifferenceButton)
+    
+    doseDifferenceLayout = qt.QFormLayout(doseDifferenceButton)
+    #
+    # Select SBRT dose
+    #
+    self.selectSBRTDose = slicer.qMRMLNodeComboBox()
+    self.selectSBRTDose.nodeTypes = ( ("vtkMRMLScalarVolumeNode"),"" )
+    #self.selectSBRTDose.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
+    #self.selectSBRTDose.selectSBRTDoseUponCreation = True
+    self.selectSBRTDose.addEnabled = False
+    self.selectSBRTDose.removeEnabled = False
+    self.selectSBRTDose.noneEnabled = True
+    self.selectSBRTDose.showHidden = False
+    self.selectSBRTDose.showChildNodeTypes = False
+    self.selectSBRTDose.setMRMLScene( slicer.mrmlScene )
+    self.selectSBRTDose.setToolTip( "Select SBRT dose volume." )
+    doseDifferenceLayout.addRow("SBRT dose: ", self.selectSBRTDose)
+    #
+    # Select PT dose
+    #
+    self.selectPTDose = slicer.qMRMLNodeComboBox()
+    self.selectPTDose.nodeTypes = ( ("vtkMRMLScalarVolumeNode"),"" )
+    #self.selectPTDose.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
+    #self.selectPTDose.selectPTDoseUponCreation = True
+    self.selectPTDose.addEnabled = False
+    self.selectPTDose.removeEnabled = False
+    self.selectPTDose.noneEnabled = True
+    self.selectPTDose.showHidden = False
+    self.selectPTDose.showChildNodeTypes = False
+    self.selectPTDose.setMRMLScene( slicer.mrmlScene )
+    self.selectPTDose.setToolTip( "Select PT dose volume." )
+    doseDifferenceLayout.addRow("PT dose: ", self.selectPTDose)
+    #
+    # Recalculate button
+    #
+    self.setDoseDifferenceButton = qt.QPushButton("Calculate dose difference")
+    self.setDoseDifferenceButton.toolTip = "Takes two doses into account and calculates their difference."
+    self.setDoseDifferenceButton.enabled = True
+    doseDifferenceLayout.addRow(self.setDoseDifferenceButton)
+    
     # connections
     self.showLabelMapButton.connect('clicked(bool)', self.onShowLabelMapButton)
     self.show3DButton.connect('clicked(bool)', self.onShow3DButton)
@@ -229,6 +275,7 @@ class LoadCTXWidget:
     self.setVectorFieldButton.connect('clicked(bool)', self.onSetVectorFieldButton)
     self.pyhsDoseCheckBox.connect('clicked(bool)',self.onChangePyhsDoseCheckBox)
     self.selectVolume.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
+    self.setDoseDifferenceButton.connect('clicked(bool)', self.onSetDoseDifferenceButton)
 
 
     # Add vertical spacer
@@ -375,6 +422,14 @@ class LoadCTXWidget:
       self.optDoseBox.setValue(1000)
       self.optDoseBox.enabled = False
   
+  def onSetDoseDifferenceButton(self):
+    logic = LoadCTXLogic()
+    sbrtNode = self.selectSBRTDose.currentNode()
+    ptNode = self.selectPTDose.currentNode()
+    if not ptNode or not sbrtNode:
+      print "No SBRT and/or PT dose!."
+      return
+    logic.makeDoseDifference(sbrtNode,ptNode)
   def onReload(self,moduleName="LoadCTX"):
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
@@ -429,15 +484,15 @@ class LoadCTXLogic:
     volumesLogic = slicer.vtkSlicerVolumesLogic()
     volumesLogic.SetMRMLScene(slicer.mrmlScene)
     slicerVolumeName = os.path.splitext(os.path.basename(filePath))[0]
-    volumeNode = volumesLogic.AddArchetypeVolume(filePath,slicerVolumeName,0)
+    slicerVolume = volumesLogic.AddArchetypeVolume(filePath,slicerVolumeName,0)
     
-    volumeNode.SetOrigin(voi.getSlicerOrigin())
-    if not volumeNode:
+    slicerVolume.SetOrigin(voi.getSlicerOrigin())
+    if not slicerVolume:
       print "Can't load volume " + os.path.basename(filePath)
       return None
       
     try:
-       array = slicer.util.array(volumeNode.GetID())
+       array = slicer.util.array(slicerVolume.GetID())
     except AttributeError:
       import sys
       sys.stderr.write('Cannot get array.')
@@ -449,12 +504,12 @@ class LoadCTXLogic:
 	index = voi.voiNumber
       else:
 	index = 0
-      volumeNode = self.convertLabelMapToClosedSurfaceModel(volumeNode, index)
+      slicerVolume = self.convertLabelMapToClosedSurfaceModel(slicerVolume, index)
     else:
       displayNode = slicer.vtkMRMLScalarVolumeDisplayNode()
       displayNode.SetAndObserveColorNodeID("vtkMRMLColorTableNodeGrey")
       slicer.mrmlScene.AddNode(displayNode)
-      volumeNode.SetAndObserveDisplayNodeID(displayNode.GetID())
+      slicerVolume.SetAndObserveDisplayNodeID(displayNode.GetID())
     
                   	  
     if 0:
@@ -530,15 +585,13 @@ class LoadCTXLogic:
         contourNode.GetDisplayNode().SetColor(color[0:3])
         slicer.mrmlScene.RemoveNode(slicerVolume)
 	
-    
-    pbar.setValue(100)
-    pbar.close()
     print "Done!"
     return slicerVolume.GetID()
 
   def setVectorField(self, vectorNode):
     spacing = vectorNode.GetSpacing()
     vectorArray = slicer.util.array(vectorNode.GetID())
+    
     for i in range(0,3):
       vectorArray[:,:,:,i] = vectorArray[:,:,:,i] * spacing[i]
     vectorNode.GetImageData().Modified()
@@ -559,11 +612,18 @@ class LoadCTXLogic:
     else:
       print "No display node for:"+doseNode.GetName()
       return
-    newArray = np.zeros(sbrtArray.shape)
-    dim = sbrtArray.shape
-       
+  def makeDoseDifference(self,sbrtNode,ptNode):   
+    sbrtArray = slicer.util.array(sbrtNode.GetID())
+    ptArray = slicer.util.array(ptNode.GetID())
+    if not sbrtArray.shape == ptArray.shape:
+      print "Array dimensions not the same!"
+      print str(sbrtArray.shape) + " vs " + str(ptArray.shape)
+      return
     #Iterate through array to determain low values, which are removed from display.
     #Lengthy process
+    newArray = np.zeros(sbrtArray.shape)
+    dim = sbrtArray.shape
+    
     print "Going through array."
     newArray = sbrtArray - ptArray
     for z in range(0,dim[0]):

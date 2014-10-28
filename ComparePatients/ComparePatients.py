@@ -218,7 +218,7 @@ class ComparePatientsWidget:
     #
     # Load voi for distance
     #
-    self.loadVOIforDistanceButton = qt.QPushButton("Load and Prepare VOI")
+    self.loadVOIforDistanceButton = qt.QPushButton("Mark target VOI")
     self.loadVOIforDistanceButton.toolTip = "Load VOI and prepare it for calculation of distance."
     self.loadVOIforDistanceButton.enabled =True
     self.parametersFormLayout.addWidget(self.loadVOIforDistanceButton, 7, 0)
@@ -270,6 +270,7 @@ class ComparePatientsWidget:
     
 
     self.binfo = None
+    self.targetVoi = None
     
     #First run
     self.setPlanComboBox(0)
@@ -292,7 +293,7 @@ class ComparePatientsWidget:
       normalize = False
     else:
       normalize = True
-    logic.exportMetricToClipboard2(self.patientList,metric,planPTV,normalize)
+    logic.exportMetricToClipboard(self.patientList,metric,planPTV,normalize)
     
   def onCompareButton(self):
     self.voiTable.clearContents()
@@ -345,11 +346,8 @@ class ComparePatientsWidget:
   def onLoadVOIforDistanceButton(self):
     self.onShowVoiButton()
     voi = self.binfo.get_voi_by_name(self.voiComboBox.currentText)
-    print voi.name.lower()
-    if voi.name.lower() == 'body':
-      self.bodyLineEdit.text = voi.slicerNodeID[0]
-    else:
-      self.targetLineEdit.text = voi.slicerNodeID[0]
+    self.targetLineEdit.text = voi.slicerNodeID[0]
+    self.targetVoi = voi
     
   def setVoiComboBox(self):
     import LoadCTXLib
@@ -385,18 +383,17 @@ class ComparePatientsWidget:
     
   
   def onShowVoiButton(self):
-    import LoadCTX
-    
+    import LoadCTX    
     binfo=self.binfo
     filePrefix, fileExtension = os.path.splitext(binfo.filePath)
     voi = binfo.get_voi_by_name(self.voiComboBox.currentText)
     if not voi:
       print "Error, voi not found."
       return
-    filePath = filePrefix + voi.name + ".ctx"
+    filePath = filePrefix + voi.name + ".nrrd"
     n=0 #motion state
     logic = LoadCTX.LoadCTXLogic()
-    voi.slicerNodeID[n]=logic.loadCube(filePath,2,motionState=n,voi=voi)
+    voi.slicerNodeID[n]=logic.loadVoi(filePath,motionState=n,voi=voi,threeD = True)
     
   def onSaveBestPlanButton(self):
     patient = self.getCurrentPatient()
@@ -405,7 +402,7 @@ class ComparePatientsWidget:
   
   def onComputeDistancesButton(self):
     logic = ComparePatientsLogic()
-    logic.computeDistances(self.targetLineEdit.text,self.bodyLineEdit.text)
+    logic.computeDistances(self.binfo,self.targetVoi)
   
   def setMetricComboBox(self):
     metricList = ['maxDose','calcPerscDose','meanDose','volume','d10','d30']
@@ -512,7 +509,7 @@ class ComparePatientsLogic:
   def exportMetricToClipboard(self,patientList,metric,planPTV, normOn):
     voiOrder = ["heart","spinalcord","smallerairways","esophagus","trachea",
                 "aorta","vesselslarge","airwayslarge","brachialplexus","carina",
-                "ivc","largebronchus","svc","liver","lungl","lungr"]
+                "ivc""svc","liver","lungl","lungr"]
 
     #voiOrder = ["ctv","gtv"]
     #voiOrder = ["sundr"]
@@ -525,6 +522,7 @@ class ComparePatientsLogic:
     #Look for selected patient
     selectedPatients = []
     patientOn = True
+    targets = []
     
     for voi in voiOrder:
       output_str += voi + '\t'
@@ -538,14 +536,19 @@ class ComparePatientsLogic:
     for i in range(0,len(patientList)):
       newPatient = patientList[i]
       Patients.readPatientData(newPatient,planPTV)
+      #if not newPatient.number == 2:
+        #continue
       if newPatient.number == 17 or newPatient.number == 3:
 	print "Skipping Lung0" + str(newPatient.number)
 	continue
       patientOn = True
+      argumentValueIpsi = None
+      argumentValueContra = None
       #Find out target names from pps files
       ppsFile = ppsFilePath + newPatient.name + '.pps'
-      if os.path.isfile(ppsFile):
-	targets = self.readTargetsFromPps(ppsFile)
+      #if os.path.isfile(ppsFile):
+	#targets = self.readTargetsFromPps(ppsFile)
+	
       #Create voi difference for each patient - difference between best plan and sbrt
       #print voiOrder
       if Patients.compareToSbrt(newPatient,voiOrder,planPTV):
@@ -553,46 +556,71 @@ class ComparePatientsLogic:
 	for voiName in voiOrder:
 	  voi = newPatient.get_voiDifference_by_name(voiName)
 	  if voi:
+	    #Skip if it's insignificant
+	    argumentValue = getattr(voi,metric)
+	    if argumentValue == -100 and not voiName.find('lung') > -1:
+	      output_str += '\t'
+	      continue
+      
 	    #Normalization factor
 	    normFactor = 1
+	    #Limit for significance
+	    limit = 0.1 # Gy
 	    if normOn:
 	      if metric == 'maxDose':
 		normFactor = voi.maxPerscDose
+		limit = 0.01 # %
 	      elif metric == 'calcPerscDose':
 		normFactor = voi.perscDose
-	      else:
-		normFactor = 1	      
+		limit = 0.01 # %
+	    
 	    if normFactor == 0:
 	      output_str += '\t'
 	      continue
+	    
+	    if not argumentValue == -100:
+	      argumentValue = argumentValue/normFactor
+	      
+	    #Skip if insignificant difference
+	    if abs(argumentValue) < limit and not voiName.find('lung') > -1: 
+	      output_str += '\t'
+	      continue
+	    
 	    if voiName.find('lung') > -1:
+	      print voi.name + str(argumentValue)
 	      if voiName == 'lungl':
 	        if not voi.ipsiLateral:
-	          voiContraLateral = voi
+	          argumentValueContra = argumentValue
 	          firstLung = True
 	        else:
-		  voiIpsiLateral = voi
+		  argumentValueIpsi = argumentValue
 	      elif voiName == 'lungr':
 	        if firstLung:
 		  if voi.ipsiLateral:
-		    voiIpsiLateral = voi
+		    argumentValueIpsi = argumentValue
 		  else:
 		    print "No ipsi-lateral lung"
 		    output_str += '-1\t-1\t'
 		else:
-		  voiContraLateral = voi
-	      if voiIpsiLateral and voiContraLateral:
+		  argumentValueContra = argumentValue
+	      if argumentValueIpsi and argumentValueContra:
 		#if getattr(voiIpsiLateral,metric) < 0 or getattr(voiContraLateral,metric) < 0:
 		  #patientOn = False
-	        output_str += str(round(getattr(voiIpsiLateral,metric)/normFactor,2)) +'\t'
-	        output_str += str(round(getattr(voiContraLateral,metric)/normFactor,2)) +'\t'
-	        voiIpsiLateral = None
-	        voiContraLateral = None
+		if argumentValueIpsi == - 100 or abs(argumentValueIpsi) < limit:
+		  output_str += '\t'
+	        else:
+	          output_str += str(round(argumentValueIpsi,2)) +'\t'
+	        if argumentValueContra == - 100 or abs(argumentValueContra) < limit:
+	          output_str += '\t'
+	        else:
+	          output_str += str(round(argumentValueContra,2)) +'\t'
+	        argumentValueIpsi = None
+	        argumentValueContra = None
 	        firstLung = False
 	    else:
-	      if getattr(voi,metric) < -0.05:
+	      if argumentValue < -0.05:
 		patientOn = False
-	      output_str += str(round(getattr(voi,metric)/normFactor,2)) +'\t'
+	      output_str += str(round(argumentValue,2)) +'\t'
 	  else:
 	    output_str += '\t'
 	if targets:
@@ -638,7 +666,7 @@ class ComparePatientsLogic:
   def exportMetricToClipboard2(self,patientList,metric,planPTV, normOn):
     voiOrder = ["heart","spinalcord","smallerairways","esophagus","trachea",
                 "aorta","vesselslarge","airwayslarge","brachialplexus","carina",
-                "ivc","largebronchus","svc","liver","lungl","lungr"]
+                "ivc","svc","liver","lungl","lungr"]
 
     #voiOrder = ["ctv","gtv"]
     #voiOrder = ["sundr"]
@@ -663,10 +691,10 @@ class ComparePatientsLogic:
     voiContraLateralSBRT = None
     for i in range(0,len(patientList)):
       newPatient = patientList[i]
-      if newPatient.number is not 13:
-	continue
+      #if newPatient.number is not 7:
+	#continue
       Patients.readPatientData(newPatient,planPTV)
-      if newPatient.number == 17:
+      if newPatient.number == 17 or newPatient.number == 3:
 	print "Skipping Lung0" + str(newPatient.number)
 	continue
       #Find out target names from pps files
@@ -762,131 +790,53 @@ class ComparePatientsLogic:
     clipboard.setText(output_str,qt.QClipboard.Selection)
     clipboard.setText(output_str,qt.QClipboard.Clipboard)
     
-  def computeDistances(self,targetID,bodyID,angle):
-
-    output_str = "Test"
-    output_str += '\n'
+  #def computeDistancesInPatients(self,patientList)
+  #newPatient = patientList[i]
+  def computeDistances(self,binfo,targetVoi):
+    #Setting up
+    import LoadCTX
+    logic = LoadCTX.LoadCTXLogic()
+    output_str = ""
+    #output_str = "OAR" + "\t" + "Min" + "\t" + "Max" + "\n"
+    n=0 #motion state
+    minmax = [0,0]
+    parameters = {}
+    modelToModelCLI= slicer.modules.modeltomodeldistance
     
-    #Angle has to be between -180 and 180)
-    if angle < -180 or angle > 180:
-      print "Angle " + str(angle) + " not excepted."
-      return
+    #Oar for measuring distance of target
+    oars = ["spinalcord", "smallerairways", "esophagus"]
+
+    #Create new model for output
+    outputModel = slicer.vtkMRMLModelNode()
+    slicer.mrmlScene.AddNode(outputModel)
+       
+    #Load targetVoi
+    filePrefix, fileExtension = os.path.splitext(binfo.filePath)
+    
+    filePath = filePrefix + targetVoi.name + ".nrrd"
+    targetVoi.slicerNodeID[n]=logic.loadVoi(filePath,motionState=n,voi=targetVoi,threeD = True)
+    
+    #Parameters for CLI module    
+    parameters["vtkFile1"] = targetVoi.slicerNodeID[n]
+    parameters["vtkOutput"] = outputModel.GetID()
+    parameters["distanceType"] = "absolute_closest_point"
+    
+    for oar in oars:
+      voi = binfo.get_voi_by_name(oar)
+      if not voi:
+        print "Error," + oar + " not found."
+        continue
+      filePath = filePrefix + voi.name + ".nrrd"
+      voi.slicerNodeID[n]=logic.loadVoi(filePath,motionState=n,voi=voi,threeD = True)
+      parameters["vtkFile2"] = voi.slicerNodeID[n]   
       
-
-    if angle == 180 or angle == -180:
-      angle = 0
-    targetNode = slicer.util.getNode(targetID)
-    targetArray = slicer.util.array(targetNode.GetID())
-    bodyNode = slicer.util.getNode(bodyID)
-    bodyArray = slicer.util.array(bodyNode.GetID())
-    
-    if not targetNode or not bodyNode:
-      print "Can't load target and body nodes."
-      return
-    targetOrigin = targetNode.GetOrigin()
-    bodyOrigin = bodyNode.GetOrigin()
-    #For one angle:
-    originDistance = abs(bodyOrigin[1] - targetOrigin[1])
-    
-    print "Origin distance " + str(originDistance)
-    print "Calculating distance between " + targetNode.GetName() + " and " + bodyNode.GetName()
-    #assume equal spacing in x&y and target&body
-    spacing = targetNode.GetSpacing()
-    originIndex = [0,0,0]
-    originIndex[0] = int(abs(bodyOrigin[0] - targetOrigin[0])/spacing[0])
-    originIndex[1] = int(abs(bodyOrigin[1] - targetOrigin[1])/spacing[1])
-    
-    dimensionsTarget = targetNode.GetImageData().GetDimensions()
-    dimensionsBody = bodyNode.GetImageData().GetDimensions()
-    #Create array for borders - surface are for target, Surface and Lower are for body
-    
-    xLimit = [0,0]
-    yLimit = [0,0]
-    angleCorrection = 0
-    itr = 1
-    if angle >= 0 and angle < 90:
-      xLimit[0] = originIndex[0]
-      xLimit[1] = dimensionsBody[0]
-      yLimit[0] = 0
-      yLimit[1] = originIndex[1] + dimensionsTarget[1]
-      angleCorrection = 0
-    elif angle >= 90 and angle < 180:
-      xLimit[0] = 0
-      xLimit[1] = originIndex[0] + dimensionsTarget[0]
-      yLimit[0] = 0
-      yLimit[1] = originIndex[1] + dimensionsTarget[1]
-      angleCorrection = 90
-    elif angle < 0 and angle >= -90:
-      angle = 360 + angle
-      xLimit[0] = originIndex[0]
-      xLimit[1] = dimensionsBody[0]
-      yLimit[1] = originIndex[1]-1
-      yLimit[0] = dimensionsBody[1]-1
-      itr = -1
-      angleCorrection = 270
-    elif angle < -90 and angle >= -180:
-      angle = 360 + angle
-      xLimit[0] = 0
-      xLimit[1] = originIndex[0] + dimensionsTarget[0]
-      yLimit[1] = originIndex[1]-1
-      yLimit[0] = dimensionsBody[1]-1
-      itr = -1
-      angleCorrection = 180
-    
-    
-    distance = np.zeros([dimensionsTarget[0],dimensionsTarget[2]])
-    
-    for z in range(0,dimensionsTarget[2]):
-      n = 0
-      surface = np.zeros(dimensionsTarget[0])
-      Surface = np.zeros(xLimit[1]-xLimit[0])
-      #Set up body surface, according to angle
-      for x in range(xLimit[0],xLimit[1]):
-	for y in xrange(yLimit[0],yLimit[1],itr):
-	   if not bodyArray[z][y][x] == 0:
-	      Surface[n] = abs(bodyOrigin[1]) + y*spacing[0]
-	      break
-        n += 1
-      #Look for surface and lower boundries of target
-      for x in range(0,dimensionsTarget[0]):
-	if angle <= 180:
-	  for y in range(0,dimensionsTarget[1]):
-	    if not targetArray[z][y][x] == 0:
-	      surface[x] = abs(targetOrigin[1]) + y*spacing[0]
-	      #print "Break at: " + str(x) + str(y) + str(z) + " with array value: " + str(targetArray[z][y][x])
-	      break
-        else:
-          for y in xrange(dimensionsTarget[1]-1,-1,-1):
-            if not targetArray[z][y][x] == 0:
-              surface[x] = abs(targetOrigin[1]) + y*spacing[0]
-              #print "Break at: " + str(x) + str(y) + str(z) + " with array value: " + str(targetArray[z][y][x])
-              break
-
-	#If there are target boundries, find voxel in body at the right angle
-	#angleDiff = np.zeros(xLimit[1]-xLimit[0])
-	angleDiffOld = 400
-	if not surface[x] == 0:
-	  #Nice angles computed seperatly
-	  if angle == 90:
-	    distance[x,z] = abs(Surface[x+originIndex[0]] - surface[x])
-	  elif angle == 270:
-            distance[x,z] = abs(Surface[x] - surface[x])
-          else:
-            print str(len(Surface)) + str(xLimit)
-	    for X in range(0,xLimit[1]-xLimit[0]):
-	      voxelAngle = (np.arctan( abs(Surface[X] - surface[x])/abs(X-x)/spacing[0]) * 180 / np.pi + angleCorrection)
-	      angleDiff = abs(angle - voxelAngle)
-	      if angleDiff < angleDiffOld and angleDiff < 2:
-	        print "Found angle: " + str(voxelAngle)
-	        distance[x] = np.sqrt((Surface[X] - surface[x])*(Surface[X] - surface[x]) + (X-x)*(X-x)/spacing[0]/spacing[0])
-	        break
-	      angleDiffOld = angleDiff
-	    #return angleDiff
-	    
-    print np.mean([np.mean([x for x in s if x]) for s in np.c_[distance]])
-    return surface
-
+      cliNode = slicer.cli.run(modelToModelCLI, None, parameters,wait_for_completion=True)
       
+      array = outputModel.GetPolyData().GetPointData().GetArray(0)
+      array.GetRange(minmax)
+      
+      output_str += str(minmax[0]) + "\n" + str(minmax[1]) + "\n"
+    
     print output_str
     clipboard = qt.QApplication.clipboard()
     clipboard.setText(output_str,qt.QClipboard.Selection)
@@ -936,21 +886,36 @@ class ComparePatientsLogic:
     import LoadCTXLib
     
     loadLogic = LoadCTX.LoadCTXLogic()
+    volumesLogic = slicer.vtkSlicerVolumesLogic()
+    volumesLogic.SetMRMLScene(slicer.mrmlScene)
     if patient.slicerNodeID == '':
-      filePathCT = ('/u/kanderle/AIXd/Data/FC/' + patient.name + '/CTX/'+patient.name+'_00.ctx')
+      filePathCT = ('/u/kanderle/AIXd/Data/FC/' + patient.name + '/CTX/'+patient.name+'_00.nrrd')
       if not os.path.exists(filePathCT):
 	print "No CT at: " + filePathCT
 	return
-      patient.slicerNodeID = loadLogic.loadCube(filePathCT,0, showOn = True)
+	
+      slicerVolumeName = os.path.splitext(os.path.basename(filePathCT))[0]
+      volume = volumesLogic.AddArchetypeVolume(filePathCT,slicerVolumeName)
+      if not volume:
+        print "Can't load ct " + os.path.basename(filePathCT)
+	return 
+      
+      patient.slicerNodeID = volume.GetID()
     
     if plan.slicerNodeID == '':
-      filePathPlan = ('/u/kanderle/AIXd/Data/FC/' + patient.name + '/Dose/' + plan.fileName[0:-7] + '_bio.dos')
+      filePathPlan = ('/u/kanderle/AIXd/Data/FC/' + patient.name + '/Dose/' + plan.fileName[0:-7] + '_bio.nrrd')
       if not os.path.exists(filePathPlan):
-	filePathPlan = ('/u/kanderle/AIXd/Data/FC/' + patient.name + '/Dose/' + plan.fileName[0:-7] + '_resample.dos')
+	filePathPlan = ('/u/kanderle/AIXd/Data/FC/' + patient.name + '/Dose/' + plan.fileName[0:-7] + '_resample.nrrd')
 	if not os.path.exists(filePathPlan):
 	  print "No plan at: " + filePathPlan
 	  return
-      plan.slicerNodeID = loadLogic.loadCube(filePathPlan,1,optDose = 24,showOn = True)
+	  
+      slicerVolumeName = os.path.splitext(os.path.basename(filePathPlan))[0]
+      volume = volumesLogic.AddArchetypeVolume(filePathPlan,slicerVolumeName)
+      if not volume:
+        print "Can't load dose " + os.path.basename(filePathPlan)
+	return 
+      plan.slicerNodeID = volume.GetID()
     
     #LoadCTXLib.addSeriesInHierarchy(patient,plan)
     

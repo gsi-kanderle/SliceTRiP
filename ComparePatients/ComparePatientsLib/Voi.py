@@ -92,7 +92,10 @@ class Voi():
       else:
         result = -1
     else:
-      result = method1 - method2
+      if method1 <= 0.1 and method2 <= 0.1:
+        result = -100 #Arbitrary value to find insignificant results
+      else:
+        result = method1 - method2
     return result
     
     
@@ -318,6 +321,8 @@ class Voi():
 	name = "smallerairways"
     if name.find("spinalcord") > -1:
       name = "spinalcord"
+    if name.find("largebronchus") > -1:
+      name = "airwayslarge"
     self.name = name
     
   def setDvhTableItems(self,horizontalHeaders):
