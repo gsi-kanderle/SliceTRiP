@@ -1,0 +1,17 @@
+version 1.2
+modality CT
+primary_view transversal
+data_type #TYPE#
+num_bytes #NUM_BYTES#
+byte_order #ENDIAN#
+patient_name #PATIENTNAME#
+slice_dimension #DIMX#
+pixel_size #SPACINGX#
+slice_distance #SPACINGZ#
+slice_number #DIMZ#
+xoffset #ORIGINX#
+dimx #DIMX#
+yoffset #ORIGINY#
+dimy #DIMY#
+zoffset #ORIGINZ#
+dimz #DIMZ#
