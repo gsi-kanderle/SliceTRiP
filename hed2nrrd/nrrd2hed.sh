@@ -92,11 +92,11 @@ function convertHeader {
 		SPACINGX=${SPACINGX_TMP#(}
 		SPACINGX=${SPACINGX%%,*}
 		SPACINGY_TMP=$(awk '{ if($2=="directions:") { print $4}}' ${HEADERFILE})
-		SPACINGY=${SPACINGX_TMP#(}
-		SPACINGY=${SPACINGX%%,*}
+		SPACINGY=${SPACINGY_TMP#(*,}
+		SPACINGY=${SPACINGX%,*)}
 		SPACINGZ_TMP=$(awk '{ if($2=="directions:") { print $5}}' ${HEADERFILE})
-		SPACINGZ=${SPACINGX_TMP#(}
-		SPACINGZ=${SPACINGX%%,*}
+		SPACINGZ=${SPACINGZ_TMP#(*,*,}
+		SPACINGZ=${SPACINGZ%)}
 
 		
 		if [ ! "$SPACINGX" = "$SPACINGY" ]
