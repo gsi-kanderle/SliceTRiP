@@ -60,14 +60,14 @@ class Voi():
       row += 1
     
   #Function for creating difference between two voi values
-  def createVoiDifference(self,voi1,voi2):
+  def createVoiDifference(self,voi1,voi2, norm = False):
     if not voi1.volume == voi2.volume:
       print "Volumes not the same for: " + self.name
     self.volume = voi1.volume
     
     namesList = ['calcPerscDose','maxDose','meanDose','d10','d30','d99','v24Gy']
     for name in namesList:
-      difference = self.getDifferenceForMethodName(name,voi1,voi2)
+      difference = self.getDifferenceForMethodName(name,voi1,voi2, norm)
       setattr(self, name, difference)
     
     self.setOarConstraints()
@@ -75,7 +75,7 @@ class Voi():
       self.ipsiLateral = True
     
 
-  def getDifferenceForMethodName(self,name,voi1,voi2):
+  def getDifferenceForMethodName(self,name,voi1,voi2, norm):
     try:
       method1 = getattr(voi1,name)
       method2 = getattr(voi2,name)
@@ -84,11 +84,13 @@ class Voi():
       return None
 
     #Normalization
-    if 0:
-      if not method1 == 0:
+    if norm:
+      if method1 <= 0.1 and method2 <= 0.1:
+        result = -100 #Arbitrary value to find insignificant results
+      elif not method1 == 0:
         result = (1-method2/method1)
       elif method1 == 0 and method2 == 0:
-        result = 1
+        result = 0
       else:
         result = -1
     else:

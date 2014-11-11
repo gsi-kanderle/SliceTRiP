@@ -10,7 +10,7 @@ import Voi
 
 
 # Function that compares bestPlan to sbrt plan   
-def compareToSbrt(patient,voiList=[],planPTV = False):
+def compareToSbrt(patient,voiList=[],planPTV = False, normOn = False):
   #if patient.voiDifferences:
     #print patient.name + " already has voi Differences."
     #return True
@@ -38,7 +38,6 @@ def compareToSbrt(patient,voiList=[],planPTV = False):
   
   findIpsiLateralLung(sbrtPlan)
   
-  
   if not voiList == []:
     for voi in voiList:
       voiSbrt = sbrtPlan.get_voi_by_name(voi)
@@ -52,7 +51,7 @@ def compareToSbrt(patient,voiList=[],planPTV = False):
 		  #print voiSbrt.name + "has d10 sbrt: " + str(voiSbrt.d10)
 		  #print voiSbrt.name + "has d10 pt: " + str(voiPlan.d10)
 		  
-	  v.createVoiDifference(voiSbrt,voiPlan)
+	  v.createVoiDifference(voiSbrt,voiPlan, normOn)
 	  patient.voiDifferences.append(v)
 
 	else:

@@ -551,7 +551,7 @@ class ComparePatientsLogic:
 	
       #Create voi difference for each patient - difference between best plan and sbrt
       #print voiOrder
-      if Patients.compareToSbrt(newPatient,voiOrder,planPTV):
+      if Patients.compareToSbrt(newPatient,voiOrder,planPTV,normOn):
 	output_str += newPatient.name + '\t'
 	for voiName in voiOrder:
 	  voi = newPatient.get_voiDifference_by_name(voiName)
@@ -565,8 +565,11 @@ class ComparePatientsLogic:
 	    #Normalization factor
 	    normFactor = 1
 	    #Limit for significance
-	    limit = 0.1 # Gy
 	    if normOn:
+	      limit = 0.1 # %
+	    else:
+	      limit = 0.1 # Gy
+	    if 0:
 	      if metric == 'maxDose':
 		normFactor = voi.maxPerscDose
 		limit = 0.01 # %
@@ -587,7 +590,6 @@ class ComparePatientsLogic:
 	      continue
 	    
 	    if voiName.find('lung') > -1:
-	      print voi.name + str(argumentValue)
 	      if voiName == 'lungl':
 	        if not voi.ipsiLateral:
 	          argumentValueContra = argumentValue

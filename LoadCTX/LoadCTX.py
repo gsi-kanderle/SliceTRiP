@@ -512,19 +512,19 @@ class LoadCTXLogic:
       slicerVolume.SetAndObserveDisplayNodeID(displayNode.GetID())
     
                   	  
-    if 0:
+    if 1:
 	#This Logic need some work
 	#Create subject Hierarchy
         ##Copied from SlicerSubjectHierarchyContourSetsPlugin
-        ##from vtkSlicerSubjectHierarchyModuleMRML import vtkMRMLSubjectHierarchyNode
-        #from vtkSlicerContoursModuleLogic import vtkSlicerContoursModuleLogic
-        #try:
-          #vtkMRMLSubjectHierarchyNode
-          #vtkSlicerContoursModuleLogic
-        #except AttributeError:
-          #import sys
-          #sys.stderr.write('Unable to load vtkMRMLSubjectHierarchyNode and vtkSlicerContoursModuleLogic')
-          #return
+        from vtkSlicerSubjectHierarchyModuleMRML import vtkMRMLSubjectHierarchyNode
+        from vtkSlicerContoursModuleLogic import vtkSlicerContoursModuleLogic
+        try:
+          vtkMRMLSubjectHierarchyNode
+          vtkSlicerContoursModuleLogic
+        except AttributeError:
+          import sys
+          sys.stderr.write('Unable to load vtkMRMLSubjectHierarchyNode and vtkSlicerContoursModuleLogic')
+          return
         subjectNode = vtkMRMLSubjectHierarchyNode()
         subjectNode.SetName(patientName + '_SubjectHierarchy')
         subjectNode.SetLevel('Subject')
@@ -598,6 +598,13 @@ class LoadCTXLogic:
     print "Finshed!"
     
   def setDose(self, doseNode, optDose):
+    #Set attribute
+    doseNode.SetAttribute('DicomRtImport.DoseVolume','1')
+    
+    #Set Origins
+    doseNode.SetOrigin([300,263,92])
+
+    #Set display
     slicerVolumeDisplay=doseNode.GetScalarVolumeDisplayNode()
     if slicerVolumeDisplay:
       slicerVolumeDisplay.AutoWindowLevelOff()
