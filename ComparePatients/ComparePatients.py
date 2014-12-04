@@ -111,7 +111,7 @@ class ComparePatientsWidget:
       #self.setPatientPathFromNumber(patientNumber,filePath,patientPath)
     
     self.patientList = []
-    for patientNumber in range(1,21+1):
+    for patientNumber in range(1,23+1):
       if patientNumber < 10:
         number = '0' + str(patientNumber)
       else:
