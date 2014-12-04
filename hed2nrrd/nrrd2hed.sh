@@ -121,7 +121,7 @@ function convertHeader {
 		fi		
 			
 		NEWFILE="$PREFIX.$SUFFIX"
-		mv $FLIST $PREFIX.$SUFFIX
+		mv ${DIRNAME}/$FLIST ${DIRNAME}/$PREFIX.$SUFFIX
 		sed -e s/$FLIST/$NEWFILE/g $oldHeader > $HEADERFILE
 		rm $oldHeader
 
