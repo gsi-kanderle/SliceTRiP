@@ -216,7 +216,15 @@ class LoadCTXWidget:
     self.setOriginButton = qt.QPushButton("Set Origins to zero")
     self.setOriginButton.toolTip = "Set origins to zero."
     self.setOriginButton.enabled = True
-    doseFormLayout.addRow(self.setOriginButton)
+    self.optDoseLayout.addWidget(self.setOriginButton,2,0)
+    
+    #
+    # Prepare plan cube
+    #
+    self.setPlanCubeButton = qt.QPushButton("Set plan cube")
+    self.setPlanCubeButton.toolTip = "Prepares plan cube based on input dose cube and dose optimization value."
+    self.setPlanCubeButton.enabled = False
+    self.optDoseLayout.addWidget(self.setPlanCubeButton,2,1)
     
     #
     # Modify Volumes
@@ -230,7 +238,7 @@ class LoadCTXWidget:
     # Select SBRT dose
     #
     self.selectSBRTDose = slicer.qMRMLNodeComboBox()
-    self.selectSBRTDose.nodeTypes = ( ("vtkMRMLScalarVolumeNode"),"" )
+    self.selectSBRTDose.nodeTypes = ( ("vtkMRMLScalarVolumeNode"),("vtkMRMLVectorVolumeNode"),"" )
     #self.selectSBRTDose.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
     #self.selectSBRTDose.selectSBRTDoseUponCreation = True
     self.selectSBRTDose.addEnabled = False
@@ -245,7 +253,7 @@ class LoadCTXWidget:
     # Select PT dose
     #
     self.selectPTDose = slicer.qMRMLNodeComboBox()
-    self.selectPTDose.nodeTypes = ( ("vtkMRMLScalarVolumeNode"),"" )
+    self.selectPTDose.nodeTypes = ( ("vtkMRMLScalarVolumeNode"),("vtkMRMLVectorVolumeNode"),"" )
     #self.selectPTDose.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
     #self.selectPTDose.selectPTDoseUponCreation = True
     self.selectPTDose.addEnabled = False
@@ -263,11 +271,19 @@ class LoadCTXWidget:
     self.setDoseDifferenceButton.toolTip = "Takes two doses into account and calculates their difference."
     self.setDoseDifferenceButton.enabled = True
     doseDifferenceLayout.addRow(self.setDoseDifferenceButton)
+    #
+    # Copy origin button
+    #
+    self.setCopyOriginButton = qt.QPushButton("Copy Origin")
+    self.setCopyOriginButton.toolTip = "Takes origin from SBRT and copy it to PT."
+    self.setCopyOriginButton.enabled = True
+    doseDifferenceLayout.addRow(self.setCopyOriginButton)
     
     # connections
     self.showLabelMapButton.connect('clicked(bool)', self.onShowLabelMapButton)
     self.show3DButton.connect('clicked(bool)', self.onShow3DButton)
     self.setOriginButton.connect('clicked(bool)', self.onSetOriginButton)
+    self.setPlanCubeButton.connect('clicked(bool)', self.onSetPlanCubeButton)
     self.loadButton.connect('clicked(bool)', self.onLoadButton)
     self.voiComboBox.connect('currentIndexChanged(QString)', self.setMotionStatesFromComboBox)
     self.binfoListFile.connect('currentIndexChanged(int)', self.setBinfoFile)
@@ -276,6 +292,7 @@ class LoadCTXWidget:
     self.pyhsDoseCheckBox.connect('clicked(bool)',self.onChangePyhsDoseCheckBox)
     self.selectVolume.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
     self.setDoseDifferenceButton.connect('clicked(bool)', self.onSetDoseDifferenceButton)
+    self.setCopyOriginButton.connect('clicked(bool)', self.onSetCopyOriginButton)
 
 
     # Add vertical spacer
@@ -291,12 +308,15 @@ class LoadCTXWidget:
     pass
 
   def onSelect(self,node):
+    if not node:
+      return
     if node.IsA('vtkMRMLVectorVolumeNode'):
       self.setVectorFieldButton.enabled = True
       self.setDoseColorButton.enabled = False
     elif node.IsA('vtkMRMLScalarVolumeNode'):
       self.setVectorFieldButton.enabled = False
       self.setDoseColorButton.enabled = True
+      self.setPlanCubeButton.enabled = True
       
   #Load Binfo in Slicer
   def onLoadButton(self): 
@@ -414,6 +434,12 @@ class LoadCTXWidget:
     print "Done!"
     return
 
+  def onSetPlanCubeButton(self):
+    logic = LoadCTXLogic()
+    doseNode = self.selectVolume.currentNode()
+    optDoseValue = self.optDoseBox.value
+    logic.setPlanCube(doseNode,optDoseValue)
+    
   def onChangePyhsDoseCheckBox(self):
     if self.pyhsDoseCheckBox.checkState() == 0:
       self.optDoseBox.setValue(25)
@@ -430,6 +456,15 @@ class LoadCTXWidget:
       print "No SBRT and/or PT dose!."
       return
     logic.makeDoseDifference(sbrtNode,ptNode)
+  
+  def onSetCopyOriginButton(self):
+    sbrtNode = self.selectSBRTDose.currentNode()
+    ptNode = self.selectPTDose.currentNode()
+    if not ptNode or not sbrtNode:
+      print "No SBRT and/or PT dose!."
+      return
+    ptNode.SetOrigin(sbrtNode.GetOrigin())
+  
   def onReload(self,moduleName="LoadCTX"):
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
@@ -512,7 +547,7 @@ class LoadCTXLogic:
       slicerVolume.SetAndObserveDisplayNodeID(displayNode.GetID())
     
                   	  
-    if 1:
+    if 0:
 	#This Logic need some work
 	#Create subject Hierarchy
         ##Copied from SlicerSubjectHierarchyContourSetsPlugin
@@ -602,7 +637,7 @@ class LoadCTXLogic:
     doseNode.SetAttribute('DicomRtImport.DoseVolume','1')
     
     #Set Origins
-    doseNode.SetOrigin([300,263,92])
+    #doseNode.SetOrigin([300,214,19.5])
 
     #Set display
     slicerVolumeDisplay=doseNode.GetScalarVolumeDisplayNode()
@@ -613,12 +648,44 @@ class LoadCTXLogic:
       if not colorNode:
         colorNode = self.CreateDefaultGSIColorTable()	    
       slicerVolumeDisplay.SetAndObserveColorNodeID(colorNode.GetID())
-      slicerVolumeDisplay.SetWindowLevelMinMax(0,round(optDose*1.05))
+      slicerVolumeDisplay.SetWindowLevelMinMax(0,round(optDose))
+      #slicerVolumeDisplay.SetWindowLevelMinMax(0,round(optDose*1.05))
       slicerVolumeDisplay.SetThreshold(1,1200)
       slicerVolumeDisplay.ApplyThresholdOn()
     else:
       print "No display node for:"+doseNode.GetName()
       return
+  
+  def setPlanCube(self, doseNode, optDose):
+    test
+    planCube = slicer.vtkMRMLScalarVolumeNode()
+    slicerVolume.Copy(doseNode)
+    planCube.SetName("PlanCube")
+    
+    slicer.mrmlScene.AddNode( planCube )
+    
+    
+    planArray = slicer.util.array(planCube.GetID())
+    
+    
+    dim = planArray.shape
+    for z in range(0,dim[0]):
+      print "Slice: " + str(z) +"/" + str(dim[0])
+      for y in range(0,dim[1]):
+        for x in range(0,dim[2]):
+	  value = optDose - planArray[z][y][x]
+	  if value < 0:
+	    planArray[z][y][x] = 0
+	  else:
+	    planArray[z][y][x] = value
+	    
+    planCube.GetImageData.Modified()
+    
+    displayNode = slicer.vtkMRMLScalarVolumeDisplayNode()
+    slicer.mrmlScene.AddNode(displayNode)
+    planCube.SetAndObserveDisplayNodeID(displayNode.GetID())
+    print "Plan Cube created."
+    
   def makeDoseDifference(self,sbrtNode,ptNode):   
     sbrtArray = slicer.util.array(sbrtNode.GetID())
     ptArray = slicer.util.array(ptNode.GetID())
@@ -776,20 +843,35 @@ class LoadCTXLogic:
     colorTableNode.SetNumberOfColors(256);
     colorTableNode.GetLookupTable().SetTableRange(0,255)
     for i in range(0,256):
-      if i<48:
+      if i<85:
         colorTableNode.AddColor(str(i), 0.06, 0, 1, 0.2)
-      elif i<97:
+      elif i<128:
 	colorTableNode.AddColor(str(i), 0, 0.94, 1, 0.2)
-      elif i<145:
+      elif i<170:
         colorTableNode.AddColor(str(i), 0.02, 0.5, 0, 0.2)
-      elif i<194:
+      elif i<213:
         colorTableNode.AddColor(str(i), 0.02, 1, 0, 0.2)
-      elif i<230:
-        colorTableNode.AddColor(str(i), 1, 1, 0, 0.2)
       elif i<255:
-        colorTableNode.AddColor(str(i), 1, 0, 0, 0.2)
+        colorTableNode.AddColor(str(i), 1, 1, 0, 0.2)
       else:
-	colorTableNode.AddColor(str(i), 1, 0, 1, 1)
+        colorTableNode.AddColor(str(i), 1, 0, 0, 0.2)
+      #else:
+	#colorTableNode.AddColor(str(i), 1, 0, 1, 1)
+    #for i in range(0,256):
+      #if i<48:
+        #colorTableNode.AddColor(str(i), 0.06, 0, 1, 0.2)
+      #elif i<97:
+	#colorTableNode.AddColor(str(i), 0, 0.94, 1, 0.2)
+      #elif i<145:
+        #colorTableNode.AddColor(str(i), 0.02, 0.5, 0, 0.2)
+      #elif i<194:
+        #colorTableNode.AddColor(str(i), 0.02, 1, 0, 0.2)
+      #elif i<230:
+        #colorTableNode.AddColor(str(i), 1, 1, 0, 0.2)
+      #elif i<255:
+        #colorTableNode.AddColor(str(i), 1, 0, 0, 0.2)
+      #else:
+	#colorTableNode.AddColor(str(i), 1, 0, 1, 1)
     slicer.mrmlScene.AddNode( colorTableNode )
     return colorTableNode
   
