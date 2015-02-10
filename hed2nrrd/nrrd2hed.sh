@@ -111,10 +111,18 @@ function convertHeader {
 			return
 		fi
 
+		#Rounding
+		ORIGINX=$(echo $ORIGINX | awk  '{ rounded = sprintf("%.0f", $1); print rounded }')
+		ORIGINY=$(echo $ORIGINY | awk  '{ rounded = sprintf("%.0f", $1); print rounded }')
+		ORIGINZ=$(echo $ORIGINZ | awk  '{ rounded = sprintf("%.0f", $1); print rounded }')
+		SPACINGX=$(echo $SPACINGX | awk  '{ rounded = sprintf("%.6f", $1); print rounded }')
+		SPACINGZ=$(echo $SPACINGZ | awk  '{ rounded = sprintf("%.6f", $1); print rounded }')
+
+
 		ENCODING=$(awk '{ if($1=="encoding:") { print $2}}' ${HEADERFILE})
 		if [ "$ENCODING" = "gzip" ]
 		then
-				gunzip $FLIST
+				gunzip ${DIRNAME}/$FLIST
 				FLIST=${FLIST%%.gz}
 				sed -e s/"gzip"/"raw"/g $oldHeader > $HEADERFILE
 				cp $HEADERFILE $oldHeader
