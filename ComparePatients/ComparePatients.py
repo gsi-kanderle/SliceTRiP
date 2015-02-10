@@ -293,7 +293,7 @@ class ComparePatientsWidget:
       normalize = False
     else:
       normalize = True
-    logic.exportMetricToClipboard(self.patientList,metric,planPTV,normalize)
+    logic.exportMetricToClipboard2(self.patientList,metric,planPTV,normalize)
     
   def onCompareButton(self):
     self.voiTable.clearContents()
@@ -405,7 +405,7 @@ class ComparePatientsWidget:
     logic.computeDistances(self.binfo,self.targetVoi)
   
   def setMetricComboBox(self):
-    metricList = ['maxDose','calcPerscDose','meanDose','volume','d10','d30']
+    metricList = ['maxDose','calcPerscDose','meanDose','volume','d10','d30','v7Gy']
     self.metricComboBox.enabled = True
     self.metricComboBox.clear()
     for string in metricList:
@@ -509,7 +509,7 @@ class ComparePatientsLogic:
   def exportMetricToClipboard(self,patientList,metric,planPTV, normOn):
     voiOrder = ["heart","spinalcord","smallerairways","esophagus","trachea",
                 "aorta","vesselslarge","airwayslarge","brachialplexus","carina",
-                "ivc""svc","liver","lungl","lungr"]
+                "ivc","svc","liver","lungl","lungr","lungs-ptv"]
 
     #voiOrder = ["ctv","gtv"]
     #voiOrder = ["sundr"]
@@ -589,7 +589,7 @@ class ComparePatientsLogic:
 	      output_str += '\t'
 	      continue
 	    
-	    if voiName.find('lung') > -1:
+	    if voiName.find('lung') > -1 and voiName is not "lungs-ptv":
 	      if voiName == 'lungl':
 	        if not voi.ipsiLateral:
 	          argumentValueContra = argumentValue
@@ -668,7 +668,7 @@ class ComparePatientsLogic:
   def exportMetricToClipboard2(self,patientList,metric,planPTV, normOn):
     voiOrder = ["heart","spinalcord","smallerairways","esophagus","trachea",
                 "aorta","vesselslarge","airwayslarge","brachialplexus","carina",
-                "ivc","svc","liver","lungl","lungr"]
+                "ivc","svc","liver","lungl","lungr","lungs-ptv"]
 
     #voiOrder = ["ctv","gtv"]
     #voiOrder = ["sundr"]
@@ -696,7 +696,7 @@ class ComparePatientsLogic:
       #if newPatient.number is not 7:
 	#continue
       Patients.readPatientData(newPatient,planPTV)
-      if newPatient.number == 17 or newPatient.number == 3:
+      if newPatient.number == 17 or newPatient.number == 3 or newPatient.number > 21:
 	print "Skipping Lung0" + str(newPatient.number)
 	continue
       #Find out target names from pps files
@@ -729,7 +729,7 @@ class ComparePatientsLogic:
 	    if normFactor == 0:
 	      output_str += '\t'
 	      continue
-	    if voiName.find('lung') > -1:
+	    if voiName.find('lung') > -1 and voiName is not "lungs-ptv":
 	      if voiName == 'lungl':
 	        if not voiSBRT.ipsiLateral:
 	          voiContraLateralSBRT = voiSBRT
@@ -755,6 +755,7 @@ class ComparePatientsLogic:
 
 	        output_str += str(round(getattr(voiIpsiLateralSBRT,metric)/normFactor,2)) +'\t'
 	        output_str += str(round(getattr(voiIpsiLateralPT,metric)/normFactor,2)) +'\t'
+	        #output_str += '\n'
 	        output_str += str(round(getattr(voiContraLateralSBRT,metric)/normFactor,2)) +'\t'
 	        output_str += str(round(getattr(voiContraLateralPT,metric)/normFactor,2)) +'\t'
 	        voiIpsiLateralSBRT = None
@@ -767,6 +768,7 @@ class ComparePatientsLogic:
 	  else:
 	    #output_str += '\t'
 	    output_str += '\t' + '\t'
+	  #output_str += '\n'
 	#if targets:
 	  #Patients.compareToSbrt(newPatient,targets,planPTV)
 	  #metricD99 = 'v24Gy'

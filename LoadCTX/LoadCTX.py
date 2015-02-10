@@ -272,6 +272,13 @@ class LoadCTXWidget:
     self.setDoseDifferenceButton.enabled = True
     doseDifferenceLayout.addRow(self.setDoseDifferenceButton)
     #
+    # Recalculate button
+    #
+    self.setVOIUnionButton = qt.QPushButton("Create VOI Union")
+    self.setVOIUnionButton.toolTip = "Takes two scalar volumes and makes or operation between them."
+    self.setVOIUnionButton.enabled = True
+    doseDifferenceLayout.addRow(self.setVOIUnionButton)
+    #
     # Copy origin button
     #
     self.setCopyOriginButton = qt.QPushButton("Copy Origin")
@@ -292,6 +299,7 @@ class LoadCTXWidget:
     self.pyhsDoseCheckBox.connect('clicked(bool)',self.onChangePyhsDoseCheckBox)
     self.selectVolume.connect("currentNodeChanged(vtkMRMLNode*)", self.onSelect)
     self.setDoseDifferenceButton.connect('clicked(bool)', self.onSetDoseDifferenceButton)
+    self.setVOIUnionButton.connect('clicked(bool)', self.onSetVOIUnionButton)
     self.setCopyOriginButton.connect('clicked(bool)', self.onSetCopyOriginButton)
 
 
@@ -457,6 +465,15 @@ class LoadCTXWidget:
       return
     logic.makeDoseDifference(sbrtNode,ptNode)
   
+  def onSetVOIUnionButton(self):
+    logic = LoadCTXLogic()
+    voi1Node = self.selectSBRTDose.currentNode()
+    voi2Node = self.selectPTDose.currentNode()
+    if not voi1Node or not voi2Node:
+      print "Input two vois!."
+      return
+    logic.makeVOIUnioun(voi1Node,voi2Node)
+    
   def onSetCopyOriginButton(self):
     sbrtNode = self.selectSBRTDose.currentNode()
     ptNode = self.selectPTDose.currentNode()
@@ -465,6 +482,7 @@ class LoadCTXWidget:
       return
     ptNode.SetOrigin(sbrtNode.GetOrigin())
   
+
   def onReload(self,moduleName="LoadCTX"):
     """Generic reload method for any scripted module.
     ModuleWizard will subsitute correct default moduleName.
@@ -545,6 +563,7 @@ class LoadCTXLogic:
       displayNode.SetAndObserveColorNodeID("vtkMRMLColorTableNodeGrey")
       slicer.mrmlScene.AddNode(displayNode)
       slicerVolume.SetAndObserveDisplayNodeID(displayNode.GetID())
+      #slicerVolume.SetLabelMap(1)
     
                   	  
     if 0:
@@ -657,29 +676,31 @@ class LoadCTXLogic:
       return
   
   def setPlanCube(self, doseNode, optDose):
-    test
-    planCube = slicer.vtkMRMLScalarVolumeNode()
-    slicerVolume.Copy(doseNode)
-    planCube.SetName("PlanCube")
+    doseArray = slicer.util.array(doseNode.GetID())
+    newArray = np.zeros(doseArray.shape)
+    dim = doseArray.shape
     
-    slicer.mrmlScene.AddNode( planCube )
-    
-    
-    planArray = slicer.util.array(planCube.GetID())
-    
-    
-    dim = planArray.shape
     for z in range(0,dim[0]):
       print "Slice: " + str(z) +"/" + str(dim[0])
       for y in range(0,dim[1]):
         for x in range(0,dim[2]):
-	  value = optDose - planArray[z][y][x]
-	  if value < 0:
-	    planArray[z][y][x] = 0
-	  else:
-	    planArray[z][y][x] = value
-	    
-    planCube.GetImageData.Modified()
+	  value = optDose - doseArray[z][y][x]
+	  if value > 2:
+	    newArray[z][y][x] = value
+	  elif value > 0.1 and value < 2:
+	    newArray[z][y][x] = 2
+
+    importer=LoadCTXLib.vtkImageImportFromArray()
+    importer.SetArray(newArray)
+    
+    planCube = slicer.vtkMRMLScalarVolumeNode()
+    planCube.Copy(doseNode)
+    slicerName = 'PlanCube'
+    slicerName = slicer.mrmlScene.GenerateUniqueName(slicerName)         
+    planCube.SetName(slicerName)
+    
+    slicer.mrmlScene.AddNode( planCube )
+    planCube.SetAndObserveImageData(importer.GetOutput())
     
     displayNode = slicer.vtkMRMLScalarVolumeDisplayNode()
     slicer.mrmlScene.AddNode(displayNode)
@@ -745,6 +766,51 @@ class LoadCTXLogic:
     
     print "Finshed!"
     
+  def makeVOIUnioun(self,voi1Node,voi2Node):   
+    voi1Array = slicer.util.array(voi1Node.GetID())
+    voi2Array = slicer.util.array(voi2Node.GetID())
+    if not voi1Array.shape == voi2Array.shape:
+      print "Array dimensions not the same!"
+      print str(voi1Array.shape) + " vs " + str(voi2Array.shape)
+      return
+    #Iterate through array to determain low values, which are removed from display.
+    #Lengthy process
+    newArray = np.zeros(voi1Array.shape)
+    dim = voi1Array.shape
+    
+    print "Going through array."
+    #newArray = voi1Array + voi2Array
+    for z in range(0,dim[0]):
+      print "Slice: " + str(z) +"/" + str(dim[0])
+      for y in range(0,dim[1]):
+        for x in range(0,dim[2]):
+	  if voi1Array[z][y][x] == 1 or voi2Array[z][y][x] == 1: #and abs(voi2Array[z][y][x]) < 0.1:
+	    newArray[z][y][x] = 1
+
+    
+    #importer=LoadCTXLib.vtkImageImportFromArray()
+    #importer.SetArray(newArray)
+    slicerVolume = slicer.vtkMRMLScalarVolumeNode()
+
+    slicerVolume.Copy(voi1Node)
+    
+    slicer.mrmlScene.AddNode( slicerVolume )
+    #slicerVolume.SetAndObserveImageData(importer.GetOutput())
+    
+    slicerName = 'VoiUnion'
+    slicerName = slicer.mrmlScene.GenerateUniqueName(slicerName)         
+    slicerVolume.SetName(slicerName)
+    
+    displayNode = slicer.vtkMRMLScalarVolumeDisplayNode()
+    slicer.mrmlScene.AddNode(displayNode)
+    slicerVolume.SetAndObserveDisplayNodeID(displayNode.GetID())
+    
+    slicerArray = slicer.util.array(slicerVolume.GetID())
+    slicerArray[:] = newArray[:]
+    
+    slicerVolume.GetImageData().Modified()
+      
+    print "Finshed!"
   #This code is translated from SlicerRT module Contours.
   def convertLabelMapToClosedSurfaceModel(self, labelMapNode, index=0):
     if labelMapNode is None:
@@ -752,27 +818,27 @@ class LoadCTXLogic:
       return
     else:
       imageData = labelMapNode.GetImageData()
-    
+  
     #Padding labelmap with 1 pixel around the image, shifting origin
     padder = vtk.vtkImageConstantPad()
     translator = vtk.vtkImageChangeInformation()
-    translator.SetInput(imageData)
+    translator.SetInputData(imageData)
       
     # Translate the extent by 1 pixel
-    translator.SetExtentTranslation(1, 1, 1);
+    translator.SetExtentTranslation(1, 1, 1)
     # Args are: -padx*xspacing, -pady*yspacing, -padz*zspacing but padding and spacing are both 1
-    translator.SetOriginTranslation(-1.0, -1.0, -1.0);
-    padder.SetInput(translator.GetOutput());
+    translator.SetOriginTranslation(-1.0, -1.0, -1.0)
+    padder.SetInputConnection(translator.GetOutputPort())
     padder.SetConstant(0);
     translator.Update();
-    extent = imageData.GetWholeExtent()
+    extent = imageData.GetExtent()
     #Now set the output extent to the new size, padded by 2 on the positive side
     padder.SetOutputWholeExtent(extent[0], extent[1] + 2,
         extent[2], extent[3] + 2,
         extent[4], extent[5] + 2)
     
     marchingCubes = vtk.vtkMarchingCubes() 
-    marchingCubes.SetInput(padder.GetOutput())
+    marchingCubes.SetInputConnection(padder.GetOutputPort())
     marchingCubes.SetNumberOfContours(1)
     marchingCubes.SetValue(1,1)
     marchingCubes.ComputeGradientsOff()
@@ -783,13 +849,18 @@ class LoadCTXLogic:
       print "Can't create Model."
       return None
       
-    ##Decimate feature is disabled for now - the resulting contours are too small.
+    
+    #triangle = vtk.vtkTriangleFilter()
+    #triangle.SetInputData(marchingCubes.GetOutput())
+    #triangle.Update()
+    
+    ###Decimate feature is disabled for now - the resulting contours are too small.
     #decimate = vtk.vtkDecimatePro()
-    #decimate.SetInput(marchingCubes.GetOutput())
+    #decimate.SetInputData(triangle.GetOutput())
     #decimate.SetFeatureAngle(60)
     #decimate.SplittingOff()
     #decimate.PreserveTopologyOn()
-    #decimate.SetMaximumError(0.5)
+    #decimate.SetMaximumError(0.1)
     #decimate.SetTargetReduction(1)
     #decimate.Update()
     
@@ -802,7 +873,7 @@ class LoadCTXLogic:
     transformation.Inverse()
     
     transformFilter = vtk.vtkTransformPolyDataFilter()
-    transformFilter.SetInput(marchingCubes.GetOutput())
+    transformFilter.SetInputConnection(marchingCubes.GetOutputPort())
     transformFilter.SetTransform(transformation)
     transformFilter.Update()
 
@@ -842,36 +913,36 @@ class LoadCTXLogic:
     colorTableNode.HideFromEditorsOn();
     colorTableNode.SetNumberOfColors(256);
     colorTableNode.GetLookupTable().SetTableRange(0,255)
-    for i in range(0,256):
-      if i<85:
-        colorTableNode.AddColor(str(i), 0.06, 0, 1, 0.2)
-      elif i<128:
-	colorTableNode.AddColor(str(i), 0, 0.94, 1, 0.2)
-      elif i<170:
-        colorTableNode.AddColor(str(i), 0.02, 0.5, 0, 0.2)
-      elif i<213:
-        colorTableNode.AddColor(str(i), 0.02, 1, 0, 0.2)
-      elif i<255:
-        colorTableNode.AddColor(str(i), 1, 1, 0, 0.2)
-      else:
-        colorTableNode.AddColor(str(i), 1, 0, 0, 0.2)
-      #else:
-	#colorTableNode.AddColor(str(i), 1, 0, 1, 1)
     #for i in range(0,256):
-      #if i<48:
+      #if i<85:
         #colorTableNode.AddColor(str(i), 0.06, 0, 1, 0.2)
-      #elif i<97:
+      #elif i<128:
 	#colorTableNode.AddColor(str(i), 0, 0.94, 1, 0.2)
-      #elif i<145:
+      #elif i<170:
         #colorTableNode.AddColor(str(i), 0.02, 0.5, 0, 0.2)
-      #elif i<194:
+      #elif i<213:
         #colorTableNode.AddColor(str(i), 0.02, 1, 0, 0.2)
-      #elif i<230:
-        #colorTableNode.AddColor(str(i), 1, 1, 0, 0.2)
       #elif i<255:
+        #colorTableNode.AddColor(str(i), 1, 1, 0, 0.2)
+      #else:
         #colorTableNode.AddColor(str(i), 1, 0, 0, 0.2)
       #else:
 	#colorTableNode.AddColor(str(i), 1, 0, 1, 1)
+    for i in range(0,256):
+      if i<48:
+        colorTableNode.AddColor(str(i), 0.06, 0, 1, 0.2)
+      elif i<97:
+	colorTableNode.AddColor(str(i), 0, 0.94, 1, 0.2)
+      elif i<145:
+        colorTableNode.AddColor(str(i), 0.02, 0.5, 0, 0.2)
+      elif i<194:
+        colorTableNode.AddColor(str(i), 0.02, 1, 0, 0.2)
+      elif i<230:
+        colorTableNode.AddColor(str(i), 1, 1, 0, 0.2)
+      elif i<255:
+        colorTableNode.AddColor(str(i), 1, 0, 0, 0.2)
+      else:
+	colorTableNode.AddColor(str(i), 1, 0, 1, 1)
     slicer.mrmlScene.AddNode( colorTableNode )
     return colorTableNode
   

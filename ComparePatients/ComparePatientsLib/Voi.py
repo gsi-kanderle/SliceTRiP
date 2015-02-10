@@ -24,6 +24,7 @@ class Voi():
     self.d95105=0
     self.d99 = 0
     self.v24Gy = 0
+    self.v7Gy = 0
     self.dvhTableItems = []
     self.perscDose = 0
     self.perscVolume = 1
@@ -65,7 +66,7 @@ class Voi():
       print "Volumes not the same for: " + self.name
     self.volume = voi1.volume
     
-    namesList = ['calcPerscDose','maxDose','meanDose','d10','d30','d99','v24Gy']
+    namesList = ['calcPerscDose','maxDose','meanDose','d10','d30','d99','v24Gy','v7Gy']
     for name in namesList:
       difference = self.getDifferenceForMethodName(name,voi1,voi2, norm)
       setattr(self, name, difference)
@@ -130,6 +131,7 @@ class Voi():
     self.stdev = float(line.split()[5])*self.optDose
     self.mdian = float(line.split()[6])*self.optDose
     self.volume = round(float(line.split()[7])/1000,2)
+    self.rescaledVolume = self.volume
     self.voxVol=float(line.split()[8])
     i += 2
     n=0
@@ -166,6 +168,7 @@ class Voi():
 	self.d30 = 0
 	self.d99 = 0
 	self.v24Gy = 0
+	self.v7Gy = 0
 	self.calcPerscDose = 0
         return
     self.d10 = self.setValue(10)
@@ -179,9 +182,14 @@ class Voi():
     index = np.argmin(array)
     self.v24Gy = round(self.y[index],2)
     
-    if not self.perscDose == 0:
-      percantage = self.perscVolume*1e2/self.volume
-      calcDose = self.setValue(percantage)
+    #Find out volume, which gets 7 Gy. Important for Lungs
+    array = abs(self.x-7)
+    index = np.argmin(array)
+    self.v7Gy = round(self.y[index],2)
+    
+    if not self.perscDose == 0 and not self.rescaledVolume == 0:
+      percentage = self.perscVolume*1e2/self.rescaledVolume
+      calcDose = self.setValue(percentage)
       if calcDose > self.perscDose:
 	self.overOarDose = True
       self.calcPerscDose = calcDose    
@@ -305,10 +313,13 @@ class Voi():
 	if line.split()[0] == self.name.lower():
 	  rescaledVolume = float(line.split()[1])
       
+    
     if not rescaledVolume == 0:
       if abs(self.volume-rescaledVolume)/rescaledVolume > 0.1:
 	self.y = np.array(self.y)*self.volume/rescaledVolume
 	self.rescaledVolume = rescaledVolume
+
+      
 
       
   def setName(self,name):
@@ -325,6 +336,10 @@ class Voi():
       name = "spinalcord"
     if name.find("largebronchus") > -1:
       name = "airwayslarge"
+    if name.find("traquea") > -1 or name.find("trtachea") > -1:
+      name = "trachea"
+    if name.find("lungtotal-ptv1") > -1 or name.find("lungsptv") > -1:
+      name = "lungs-ptv"
     self.name = name
     
   def setDvhTableItems(self,horizontalHeaders):

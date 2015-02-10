@@ -129,8 +129,8 @@ def readPatientData(newPatient,planPTV=False):
 	      newPatient.bestPlan = None
 	      twoPlans = True
         if filePrefix.find('sbrt') > -1:
-	  if newPatient.number == 21:
-	    continue
+	  #if newPatient.number == 21:
+	    #continue
 	  #Find existing sbrt plan, otherwise create new
 	  newPlan = newPatient.loadSBRTPlan()
 	  if not newPlan:
