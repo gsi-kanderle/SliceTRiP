@@ -245,31 +245,32 @@ class CreateMovieLogic:
     if type == slicer.qMRMLScreenShotDialog().ThreeD:
       degrees = 71
       n = 0 #
-      heartBeat = 1
+      heartBeat = 0
       heartDisplayNode = None
       color = [0.56,0,0]
+      widget = lm.threeDWidget(0).threeDView()
       for i in range(0,degrees):
 	if i < 10:
 	  number = '0' + str(i)
 	else:
 	  number = str(i)
 	filePath = '/u/kanderle/Transfer/Movie/'+name+'_'+number+'.png'
-	if i%heartBeat == 0:
-	  if heartDisplayNode:
-	    heartDisplayNode.SetVisibility(0)
-	  n += 1
-	  if n>10:
-	    n = 1
-          print "Changing state to: " + str(n)
-	heartNode = slicer.util.getNode('Heart_' + str(n))
-	if not heartNode:
-	  print "No Heart Node"
-	  n = n+1
-	  continue
-	heartDisplayNode = heartNode.GetDisplayNode()
-	heartDisplayNode.SetColor(color)
-	heartDisplayNode.SetVisibility(1)
-	heartDisplayNode.SetOpacity(0.8)
+	#if i%heartBeat == 0:
+	  #if heartDisplayNode:
+	    #heartDisplayNode.SetVisibility(0)
+	  #n += 1
+	  #if n>10:
+	    #n = 1
+          #print "Changing state to: " + str(n)
+	#heartNode = slicer.util.getNode('Heart_' + str(n))
+	#if not heartNode:
+	  #print "No Heart Node"
+	  #n = n+1
+	  #continue
+	#heartDisplayNode = heartNode.GetDisplayNode()
+	#heartDisplayNode.SetColor(color)
+	#heartDisplayNode.SetVisibility(1)
+	#heartDisplayNode.SetOpacity(0.8)
 	  
 	rw = widget.renderWindow()
 	wti = vtk.vtkWindowToImageFilter()
@@ -301,7 +302,7 @@ class CreateMovieLogic:
     """
     self.enableScreenshots = enableScreenshots
     self.screenshotScaleFactor = screenshotScaleFactor
-    name = 'PigHeart'
+    name = 'Lung001'
     #self.takeScreenshot('Lung001_PT',slicer.qMRMLScreenShotDialog().ThreeD)
     self.takeScreenshot(name,slicer.qMRMLScreenShotDialog().ThreeD)
 

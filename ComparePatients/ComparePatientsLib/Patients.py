@@ -29,7 +29,8 @@ def compareToSbrt(patient,voiList=[],planPTV = False, normOn = False):
     print patient.name + " has best plan: " + patient.bestPlan.fileName
   
   sbrtPlan = None
-  sbrtPlan = patient.loadSBRTPlan()
+  sbrtPlan = patient.best3DPlan
+  #sbrtPlan = patient.loadSBRTPlan()
   
       
   if not sbrtPlan:
@@ -85,16 +86,33 @@ def findIpsiLateralLung(plan):
   
 
 #Goes through directory and reads all data into newPatient
-def readPatientData(newPatient,planPTV=False):
+def readPatientData(newPatient,planPTV=False, refPhase = 0):
   if not newPatient:
     print "Error, no newPatient!"
     
-  
+  print "BU"
   filePath = '/u/kanderle/AIXd/Data/FC/' + newPatient.name
   twoPlans = False #Flag for setting the best plan  
   
   if os.path.exists(filePath):
-    filePathGD = filePath + '/GD/'
+    filePathGD = filePath + '/GD/Old/'
+    if not os.path.isfile(filePathGD + newPatient.name + '_sbrt.dvh.gd'):
+      print "No file at " + filePathGD + newPatient.name + '_sbrt.dvh.gd'
+      return 
+    sbrtPlan = newPatient.loadSBRTPlan()
+    if not sbrtPlan:
+	    sbrtPlan = Plan()
+	    sbrtPlan.patientFlag = newPatient.number
+	    sbrtPlan.fileName = newPatient.name + '_sbrt.dvh.gd'
+	    #Manual input, because it can't read it from fileName
+	    sbrtPlan.optDose = 25
+	    sbrtPlan.sbrt = True
+	    sbrtPlan.targetPTV = True
+	    newPatient.add_plan(sbrtPlan)
+    
+    
+    sbrtPlan.readGDFile(filePathGD + newPatient.name + '_sbrt.dvh.gd')
+    
     for fileName in os.listdir(filePathGD):
       skip = False
       filePrefix, fileExtension = os.path.splitext(fileName)
@@ -105,7 +123,7 @@ def readPatientData(newPatient,planPTV=False):
 	continue
       if fileExtension == '.gd':
         # Take only 4D doses into account
-	if filePrefix.find('4D') > -1:
+	if filePrefix.find('4D') > -1 or filePrefix.find('3D'):
 	  newPlan = Plan()
 	  newPlan.fileName = fileName
 	  #Get info from filename
@@ -114,53 +132,41 @@ def readPatientData(newPatient,planPTV=False):
 	  newPlan.optDose = 25
 	  # Read dvh and add vois
 	  newPlan.patientFlag = newPatient.number
-	  newPlan.readGDFile(filePathGD + fileName)
+	  newPlan.readGDFile(filePathGD + fileName,sbrtPlan)
 	  newPatient.add_plan(newPlan)
 	  if not planPTV and not newPlan.targetPTV and not twoPlans:
             if not newPatient.bestPlan:
 	      newPatient.bestPlan = newPlan
+            if not newPatient.best3DPlan:
+              if filePrefix.find('ref' + str(refPhase)) > -1:
+                newPatient.best3DPlan = newPlan
 	    else:
 	      newPatient.bestPlan = None
+              newPatient.best3DPlan = None
 	      twoPlans = True
-	  elif planPTV and newPlan.targetPTV and not twoPlans:
-	    if not newPatient.bestPlan:
-	      newPatient.bestPlan = newPlan
-	    else:
-	      newPatient.bestPlan = None
-	      twoPlans = True
-        if filePrefix.find('sbrt') > -1:
+        #if filePrefix.find('sbrt') > -1:
 	  #if newPatient.number == 21:
 	    #continue
 	  #Find existing sbrt plan, otherwise create new
-	  newPlan = newPatient.loadSBRTPlan()
-	  if not newPlan:
-	    newPlan = Plan()
-	    newPlan.patientFlag = newPatient.number
-	    newPlan.fileName = fileName
-	    #Manual input, because it can't read it from fileName
-	    newPlan.optDose = 25
-	    newPlan.sbrt = True
-	    newPlan.targetPTV = True
-	    newPatient.add_plan(newPlan)
-	  newPlan.readGDFile(filePathGD + fileName)
-      if fileExtension == '.txt':
-	#Patient 021 special case, we take only Left Target for now
-	if newPatient.number == 21:
-	    if filePrefix.find('_L') < 0:
-	      continue
-	if filePrefix.find('sbrt') > -1:
-	  #Find existing sbrt plan, otherwise create new
-	  sbrtPlan = newPatient.loadSBRTPlan()
-	  if not sbrtPlan:
-	    sbrtPlan = Plan()
-	    sbrtPlan.patientFlag = newPatient.number
-	    sbrtPlan.fileName = fileName
-	    newPatient.add_plan(sbrtPlan)
-	  #Read values and dvh 
-	  if filePrefix.find('dvh') > -1:
-	    sbrtPlan.readTxtDvhFile(filePathGD + fileName)
-	  else:
-	    sbrtPlan.readTxtFile(filePathGD + fileName)
+	  
+      #if fileExtension == '.txt':
+	##Patient 021 special case, we take only Left Target for now
+	#if newPatient.number == 21:
+	    #if filePrefix.find('_L') < 0:
+	      #continue
+	#if filePrefix.find('sbrt') > -1:
+	  ##Find existing sbrt plan, otherwise create new
+	  #sbrtPlan = newPatient.loadSBRTPlan()
+	  #if not sbrtPlan:
+	    #sbrtPlan = Plan()
+	    #sbrtPlan.patientFlag = newPatient.number
+	    #sbrtPlan.fileName = fileName
+	    #newPatient.add_plan(sbrtPlan)
+	  ##Read values and dvh 
+	  #if filePrefix.find('dvh') > -1:
+	    #sbrtPlan.readTxtDvhFile(filePathGD + fileName)
+	  #else:
+	    #sbrtPlan.readTxtFile(filePathGD + fileName)
 	  
 
 class Patient():
@@ -175,8 +181,11 @@ class Patient():
     self.slicerNodeID = ''
     self.slicerSubjectNodeID = ''
     self.bestPlan = None
+    self.best3DPlan = None
     self.infoFilePath = '/u/kanderle/AIXd/Data/FC/' + name + '/' + name + '_info.txt'
     self.slicerTable = None
+    self.segmentation = None
+    self.this = "WhAT?"
     
   def get_voiDifferences_names(self):
         if not self.voiDifferences:
@@ -221,15 +230,16 @@ class Patient():
   def loadSBRTPlan(self):
     for plan in self.plans:
       if plan.sbrt:
-        if self.name == 'Lung021':
-	  #if plan.fileName.find('_L') > -1 or plan.fileName.find('_R') > -1: 
+	return plan
+        #if self.name == 'Lung021':
+	  ##if plan.fileName.find('_L') > -1 or plan.fileName.find('_R') > -1: 
+	    ##continue
+	  #if plan.fileName.find('_L') < 0:
 	    #continue
-	  if plan.fileName.find('_L') < 0:
-	    continue
-        return plan
+        
     return None
   
-  def loadBestPlan(self,PTV=False):
+  def loadBestPlan(self,PTV=False,refPhase = 0):
     filePath = self.infoFilePath
     fileName = ''
     if not os.path.isfile(filePath):
@@ -248,13 +258,22 @@ class Patient():
       
     if not fileName:
       return
-    
+
+    index = fileName.find('4D')
+    newFileName = fileName[0:index] + '3D_ref' + str(refPhase) + fileName[index+2:]
+    #if not os.path.isfile(newFileName):
+      #print "Can't find file " + newFileName
+
     for plan in self.plans:
       if plan.fileName == fileName:
 	self.bestPlan = plan
+      if plan.fileName == newFileName:
+        self.best3DPlan = plan
 	
-    if not self.bestPlan:
+    if not self.bestPlan or not self.best3DPlan:
       print "Error, couldn't load best Plan."
+
+ 
     
   
   def saveBestPlan(self):
@@ -311,9 +330,10 @@ class Plan():
     self.patientFlag = 0
     self.vois = []
     self.slicerNodeID = ''
+    
     #self.voiTable = None
     self.voiTableCheckBox = []
-    self.horizontalHeaders=['Show:',"Max(Gy)","D99%(Gy)","D10%(Gy)","D30(Gy)","per. Volume (Gy)","Volume(cc)"]
+    self.horizontalHeaders=['Show:',"Max(Gy)","D99%(Gy)","V95%(Gy)","D30(Gy)","per. Volume (Gy)","Volume(cc)"]
     
   def get_voi_names(self):
         names = []
@@ -437,7 +457,7 @@ class Plan():
 	  #self.oarWeigth = float(filePrefixRest[find2+1:find3-1])
 	  
   
-  def readGDFile(self,filePath):
+  def readGDFile(self,filePath,sbrtPlan=None):
     self.filePath=filePath
     fp = open(filePath,"r")
     content = fp.read().split('\n')
@@ -460,7 +480,13 @@ class Plan():
 	    self.add_voi(v)
 	  i = v.readGDFile(content,i)
 	  v.setOarConstraints()
-	  v.setVolumes(self.patientFlag)
+	  if sbrtPlan is not None:
+	    sbrtVoi = sbrtPlan.get_voi_by_name(v.name)
+	    if sbrtVoi:
+	      v.rescaledVolume = sbrtVoi.volume
+	    #else:
+	      #print "Can't set volumes for " + v.name
+	    v.setVolumes()
 	  v.calculateDose()
 	  
           #v.setSlicerOrigin(self.dimx,self.dimy,self.pixel_size)
@@ -520,7 +546,7 @@ class Plan():
         self.voiTableCheckBox.append(checkBox)
         table.setCellWidget(i,0,checkBox)
       voi = self.vois[i]
-      doseValues = [str(voi.maxDose)+"/"+str(voi.maxPerscDose),str(voi.d99),str(voi.d10),str(voi.d30),
+      doseValues = [str(voi.maxDose)+"/"+str(voi.maxPerscDose),str(voi.d99),str(voi.v95),str(voi.d30),
            str(voi.calcPerscDose)+"/"+str(voi.perscDose),str(voi.volume)+"/"+str(voi.rescaledVolume)]
       self.setVoiTable(table,voi,doseValues,i)
       #self.voiComboBox.addItem(voi)

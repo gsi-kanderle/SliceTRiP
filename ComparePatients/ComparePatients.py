@@ -293,7 +293,7 @@ class ComparePatientsWidget:
       normalize = False
     else:
       normalize = True
-    logic.exportMetricToClipboard2(self.patientList,metric,planPTV,normalize)
+    logic.exportMetricToClipboard(self.patientList,metric,planPTV,normalize)
     
   def onCompareButton(self):
     self.voiTable.clearContents()
@@ -337,6 +337,7 @@ class ComparePatientsWidget:
       self.planComboBox.addItem(plan.fileName)
     self.setMetricComboBox()
     self.setVoiComboBox()
+    #self.patientNumber = patientNumber
     
     #metricList = ['maxDose','calcPerscDose','meanDose','volume']
     #logic = ComparePatientsLogic()
@@ -361,12 +362,14 @@ class ComparePatientsWidget:
 	return
     self.voiComboBox.clear() 
     binfo = LoadCTXLib.Binfo()
-    binfo.readFile(filePath)   
+    binfo.readFile(filePath)
+    
     for voiName in binfo.get_voi_names():
       voi = binfo.get_voi_by_name(voiName)
       self.voiComboBox.addItem(voiName)
     self.binfo = binfo
     self.voiComboBox.enabled = True
+    
     
   def onExportDVHButton(self):
     plan = self.getCurrentPlan()
@@ -387,13 +390,25 @@ class ComparePatientsWidget:
     binfo=self.binfo
     filePrefix, fileExtension = os.path.splitext(binfo.filePath)
     voi = binfo.get_voi_by_name(self.voiComboBox.currentText)
+    
+    newPatient = self.getCurrentPatient()
+    segmentationNode = newPatient.segmentation
+    
+    if not segmentationNode:
+       segmentationNode = slicer.vtkMRMLSegmentationNode()
+       segmentationNode.SetName(newPatient.name)
+       displayNode = slicer.vtkMRMLSegmentationDisplayNode()
+       slicer.mrmlScene.AddNode(displayNode)
+       segmentationNode.SetAndObserveDisplayNodeID(displayNode.GetID())
+       slicer.mrmlScene.AddNode(segmentationNode)
+       
     if not voi:
       print "Error, voi not found."
       return
     filePath = filePrefix + voi.name + ".nrrd"
     n=0 #motion state
     logic = LoadCTX.LoadCTXLogic()
-    voi.slicerNodeID[n]=logic.loadVoi(filePath,motionState=n,voi=voi,threeD = True)
+    voi.slicerNodeID[n]=logic.loadVoi(filePath,segmentationNode,motionState=n,voi=voi)
     
   def onSaveBestPlanButton(self):
     patient = self.getCurrentPatient()
@@ -470,7 +485,11 @@ class ComparePatientsLogic:
         continue
       output_str += str(plan.vois[0].x[i]) +"\t"
       for voiName in voiNames:
-        output_str += str(plan.get_voi_by_name(voiName).y[i]) + "\t"
+	voi = plan.get_voi_by_name(voiName)
+	if not voi:
+	  print "Error, no " + voiName
+	  return
+        output_str += str(voi.y[i]) + "\t"
       output_str += "\n"
       
     clipboard = qt.QApplication.clipboard()
@@ -536,7 +555,7 @@ class ComparePatientsLogic:
     for i in range(0,len(patientList)):
       newPatient = patientList[i]
       Patients.readPatientData(newPatient,planPTV)
-      #if not newPatient.number == 2:
+      #if not newPatient.number == 7:
         #continue
       if newPatient.number == 17 or newPatient.number == 3:
 	print "Skipping Lung0" + str(newPatient.number)
@@ -590,35 +609,31 @@ class ComparePatientsLogic:
 	      continue
 	    
 	    if voiName.find('lung') > -1 and voiName is not "lungs-ptv":
-	      if voiName == 'lungl':
+	      #print voiName + " " + str(round(argumentValue,2))
+	      if voiName == 'lungl' or voiName == 'lungr':
 	        if not voi.ipsiLateral:
 	          argumentValueContra = argumentValue
-	          firstLung = True
 	        else:
-		  argumentValueIpsi = argumentValue
-	      elif voiName == 'lungr':
-	        if firstLung:
-		  if voi.ipsiLateral:
-		    argumentValueIpsi = argumentValue
+		  if argumentValueIpsi:
+		    argumentValueContra = argumentValue
 		  else:
-		    print "No ipsi-lateral lung"
-		    output_str += '-1\t-1\t'
-		else:
-		  argumentValueContra = argumentValue
-	      if argumentValueIpsi and argumentValueContra:
+		    argumentValueIpsi = argumentValue
+
+	      if argumentValueIpsi is not None and argumentValueContra is not None:
 		#if getattr(voiIpsiLateral,metric) < 0 or getattr(voiContraLateral,metric) < 0:
 		  #patientOn = False
-		if argumentValueIpsi == - 100 or abs(argumentValueIpsi) < limit:
+		if argumentValueIpsi == - 100:
 		  output_str += '\t'
 	        else:
 	          output_str += str(round(argumentValueIpsi,2)) +'\t'
-	        if argumentValueContra == - 100 or abs(argumentValueContra) < limit:
+	        if argumentValueContra == - 100:
 	          output_str += '\t'
 	        else:
 	          output_str += str(round(argumentValueContra,2)) +'\t'
 	        argumentValueIpsi = None
 	        argumentValueContra = None
 	        firstLung = False
+	     
 	    else:
 	      if argumentValue < -0.05:
 		patientOn = False
@@ -676,8 +691,8 @@ class ComparePatientsLogic:
     #File path for pps file:
     ppsFilePath = '/u/kanderle/AIXd/Data/FC/planpars/'
     output_str = ""
-    output_str = 'Difference in ' + metric + '\n'
-    output_str += 'Patient name\t'
+    #output_str = 'Difference in ' + metric + '\n'
+    #output_str += 'Patient name\t'
     #Look for selected patient
     selectedPatients = []
     
@@ -765,10 +780,12 @@ class ComparePatientsLogic:
 	      #output_str += str(round(getattr(voiPT,metric)/getattr(voiSBRT,metric),2)) +'\t'
 	      output_str += str(round(getattr(voiSBRT,metric)/normFactor,2)) +'\t'
 	      output_str += str(round(getattr(voiPT,metric)/normFactor,2)) +'\t'
+	    #output_str += '\n'
 	  else:
 	    #output_str += '\t'
 	    output_str += '\t' + '\t'
-	  #output_str += '\n'
+	    #pass
+	  output_str += '\n'
 	#if targets:
 	  #Patients.compareToSbrt(newPatient,targets,planPTV)
 	  #metricD99 = 'v24Gy'
@@ -899,13 +916,14 @@ class ComparePatientsLogic:
 	return
 	
       slicerVolumeName = os.path.splitext(os.path.basename(filePathCT))[0]
-      volume = volumesLogic.AddArchetypeVolume(filePathCT,slicerVolumeName)
-      if not volume:
+      success, volume = slicer.util.loadVolume(filePathCT, properties = {'name' : slicerVolumeName}, returnNode=True)
+      if not success:
         print "Can't load ct " + os.path.basename(filePathCT)
 	return 
       
       patient.slicerNodeID = volume.GetID()
     
+    return
     if plan.slicerNodeID == '':
       filePathPlan = ('/u/kanderle/AIXd/Data/FC/' + patient.name + '/Dose/' + plan.fileName[0:-7] + '_bio.nrrd')
       if not os.path.exists(filePathPlan):

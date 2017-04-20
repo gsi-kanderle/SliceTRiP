@@ -139,14 +139,10 @@ class LoadCTXWidget:
     # Show Button
     #
     self.buttonForm = qt.QGridLayout()
-    self.showLabelMapButton = qt.QPushButton("Show scalar VOI")
-    self.showLabelMapButton.enabled = False
-    self.buttonForm.addWidget(self.showLabelMapButton,0,1)
     
-    self.show3DButton = qt.QPushButton("Show 3D VOI")
+    self.show3DButton = qt.QPushButton("Load VOI")
     self.show3DButton.enabled = False
     self.buttonForm.addWidget(self.show3DButton,0,0)
-    
     binfoFormLayout.addRow(self.buttonForm)
     
     
@@ -181,7 +177,7 @@ class LoadCTXWidget:
     self.optDoseForm = qt.QFormLayout()
     self.optDoseBox = qt.QDoubleSpinBox()     
     self.optDoseBox.setToolTip( "The optimization value for dose." )
-    self.optDoseBox.setValue(25)
+    self.optDoseBox.setValue(24)
     self.optDoseBox.setRange(0, 1000)
     self.optDoseForm.addRow("Dose optimization Value", self.optDoseBox)
     
@@ -190,8 +186,14 @@ class LoadCTXWidget:
     self.pyhsDoseCheckBox.setToolTip("Check if the dose volume is in permil")
     self.pyhsDoseForm.addRow("Pyhsical dose: ", self.pyhsDoseCheckBox)
     
+    self.overDoseOffForm = qt.QFormLayout()
+    self.overDoseOffCheckBox = qt.QCheckBox()
+    self.overDoseOffCheckBox.setToolTip("Check if you don't want to display overodse.")
+    self.overDoseOffForm.addRow("Overdose Off: ", self.overDoseOffCheckBox)
+    
     self.optDoseLayout.addLayout(self.optDoseForm,0,0)
     self.optDoseLayout.addLayout(self.pyhsDoseForm,0,1)
+    self.optDoseLayout.addLayout(self.overDoseOffForm,0,2)
     
     doseFormLayout.addRow(self.optDoseLayout)
     #
@@ -218,10 +220,11 @@ class LoadCTXWidget:
     self.setOriginButton.enabled = True
     self.optDoseLayout.addWidget(self.setOriginButton,2,0)
     
+    
     #
     # Prepare plan cube
     #
-    self.setPlanCubeButton = qt.QPushButton("Set plan cube")
+    self.setPlanCubeButton = qt.QPushButton("Create trafo from VF")
     self.setPlanCubeButton.toolTip = "Prepares plan cube based on input dose cube and dose optimization value."
     self.setPlanCubeButton.enabled = False
     self.optDoseLayout.addWidget(self.setPlanCubeButton,2,1)
@@ -238,8 +241,8 @@ class LoadCTXWidget:
     # Select SBRT dose
     #
     self.selectSBRTDose = slicer.qMRMLNodeComboBox()
-    self.selectSBRTDose.nodeTypes = ( ("vtkMRMLScalarVolumeNode"),("vtkMRMLVectorVolumeNode"),"" )
-    #self.selectSBRTDose.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
+    self.selectSBRTDose.nodeTypes = ( ("vtkMRMLScalarVolumeNode"),("vtkMRMLVectorVolumeNode"),("vtkMRMLLabelMapVolumeNode"),"" )
+    #self.selectSBRTDose.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 1 )
     #self.selectSBRTDose.selectSBRTDoseUponCreation = True
     self.selectSBRTDose.addEnabled = False
     self.selectSBRTDose.removeEnabled = False
@@ -253,7 +256,7 @@ class LoadCTXWidget:
     # Select PT dose
     #
     self.selectPTDose = slicer.qMRMLNodeComboBox()
-    self.selectPTDose.nodeTypes = ( ("vtkMRMLScalarVolumeNode"),("vtkMRMLVectorVolumeNode"),"" )
+    self.selectPTDose.nodeTypes = ( ("vtkMRMLScalarVolumeNode"),("vtkMRMLVectorVolumeNode"),("vtkMRMLLabelMapVolumeNode"),"" )
     #self.selectPTDose.addAttribute( "vtkMRMLScalarVolumeNode", "LabelMap", 0 )
     #self.selectPTDose.selectPTDoseUponCreation = True
     self.selectPTDose.addEnabled = False
@@ -286,8 +289,15 @@ class LoadCTXWidget:
     self.setCopyOriginButton.enabled = True
     doseDifferenceLayout.addRow(self.setCopyOriginButton)
     
+    #
+    # Add vector volumes Button
+    #
+    self.setAddVecorButton = qt.QPushButton("Add two vector volumes")
+    self.setAddVecorButton.toolTip = "Set origins to zero."
+    self.setAddVecorButton.enabled = True
+    doseDifferenceLayout.addRow(self.setAddVecorButton)
+    
     # connections
-    self.showLabelMapButton.connect('clicked(bool)', self.onShowLabelMapButton)
     self.show3DButton.connect('clicked(bool)', self.onShow3DButton)
     self.setOriginButton.connect('clicked(bool)', self.onSetOriginButton)
     self.setPlanCubeButton.connect('clicked(bool)', self.onSetPlanCubeButton)
@@ -301,7 +311,7 @@ class LoadCTXWidget:
     self.setDoseDifferenceButton.connect('clicked(bool)', self.onSetDoseDifferenceButton)
     self.setVOIUnionButton.connect('clicked(bool)', self.onSetVOIUnionButton)
     self.setCopyOriginButton.connect('clicked(bool)', self.onSetCopyOriginButton)
-
+    self.setAddVecorButton.connect('clicked(bool)', self.onSetAddVecorButton)
 
     # Add vertical spacer
     self.layout.addStretch(1)
@@ -309,6 +319,7 @@ class LoadCTXWidget:
     # Binfo file:
     #binfo=Binfo()
     self.binfoList = []
+    self.segmentationList = []
     self.cbt = None
     
 
@@ -321,16 +332,20 @@ class LoadCTXWidget:
     if node.IsA('vtkMRMLVectorVolumeNode'):
       self.setVectorFieldButton.enabled = True
       self.setDoseColorButton.enabled = False
+      self.setPlanCubeButton.enabled = True
     elif node.IsA('vtkMRMLScalarVolumeNode'):
       self.setVectorFieldButton.enabled = False
       self.setDoseColorButton.enabled = True
-      self.setPlanCubeButton.enabled = True
+      self.setPlanCubeButton.enabled = False
       
   #Load Binfo in Slicer
   def onLoadButton(self): 
     logic = LoadCTXLogic()  
     loadFileName = qt.QFileDialog()
-    filePathList=loadFileName.getOpenFileNames()
+    #loadFileName.setFileMode(loadFileName.AnyFile)
+    #loadFileName.setFilter("Text files (*.txt)")
+    #loadFileName.setNameFilter("Images (*.png *.xpm *.jpg)");
+    filePathList=loadFileName.getOpenFileNames(caption = "Helo")
     for filePath in filePathList:
       filePrefix, fileExtension = os.path.splitext(filePath)
       if fileExtension == ".binfo":
@@ -343,6 +358,20 @@ class LoadCTXWidget:
 	#self.setBinfoFile(-1)
 	#self.binfoListFile.setCurrentIndex(-1)
 	self.binfoListFile.enabled = True
+	
+	#Create segmentation node for this binfo
+	segmentationNode = slicer.vtkMRMLSegmentationNode()
+	segmentationNode.SetName(os.path.basename(filePrefix))
+	slicer.mrmlScene.AddNode(segmentationNode)
+	self.segmentationList.append(segmentationNode)
+	
+	displayNode = slicer.vtkMRMLSegmentationDisplayNode()
+	slicer.mrmlScene.AddNode(displayNode)
+	segmentationNode.SetAndObserveDisplayNodeID(displayNode.GetID())
+	
+	storageNode = slicer.vtkMRMLSegmentationStorageNode()
+	slicer.mrmlScene.AddNode(storageNode)
+        segmentationNode.SetAndObserveStorageNodeID(storageNode.GetID())
 		
 	#for voiName in binfo.get_voi_names():
 	  #voi = binfo.get_voi_by_name(voiName)
@@ -363,6 +392,7 @@ class LoadCTXWidget:
     self.voiComboBox.clear()
     self.motionStateComboBox.clear()
     binfo = self.binfoList[binfoNumber]
+    
     #self.binfoListFile.setCurrentIndex[binfoNumber]
     for voiName in binfo.get_voi_names():
       voi = binfo.get_voi_by_name(voiName)
@@ -371,7 +401,6 @@ class LoadCTXWidget:
 	  
     self.voiComboBox.enabled = True
     self.motionStateComboBox.enabled = True
-    self.showLabelMapButton.enabled = True
     self.show3DButton.enabled = True
   
   def setMotionStatesFromComboBox(self,voiName):
@@ -390,22 +419,10 @@ class LoadCTXWidget:
     else:
       print "Error, no voi."
 
-  
-  #Load voi from binfo file
-  def onShowLabelMapButton(self):
-    binfo=self.binfoList[self.binfoListFile.currentIndex]
-    filePrefix, fileExtension = os.path.splitext(binfo.filePath)
-    voi = binfo.get_voi_by_name(self.voiComboBox.currentText)
-    if not voi:
-      print "Error, voi not found."
-      return
-    filePath = filePrefix + voi.name + ".nrrd"
-    logic = LoadCTXLogic()
-    n=self.motionStateComboBox.currentIndex
-    voi.slicerNodeID[n]=logic.loadVoi(filePath,motionState=n,voi=voi)
-  #Load voi from binfo file
+ 
   def onShow3DButton(self):
     binfo=self.binfoList[self.binfoListFile.currentIndex]
+    segmentationNode = self.segmentationList[self.binfoListFile.currentIndex]
     filePrefix, fileExtension = os.path.splitext(binfo.filePath)
     voi = binfo.get_voi_by_name(self.voiComboBox.currentText)
     if not voi:
@@ -414,7 +431,7 @@ class LoadCTXWidget:
     filePath = filePrefix + voi.name + ".nrrd"
     logic = LoadCTXLogic()
     n=self.motionStateComboBox.currentIndex
-    voi.slicerNodeID[n]=logic.loadVoi(filePath,motionState=n,voi=voi,threeD = True)
+    voi.slicerNodeID[n]=logic.loadVoi(filePath,segmentationNode, motionState=n,voi=voi)
 
   def onSetVectorFieldButton(self):
     logic = LoadCTXLogic()
@@ -431,8 +448,13 @@ class LoadCTXWidget:
     if not doseNode:
       print "No SBRT and/or PT dose!"
       return
-      
-    logic.setDose(doseNode,optDoseValue)
+    
+    if self.overDoseOffCheckBox.checkState() == 0:
+      overDoseOff = False
+    else:
+      overDoseOff = True
+    
+    logic.setDose(doseNode,optDoseValue, overDoseOff)
     
   def onSetOriginButton(self):
     nodes = slicer.util.getNodes('vtkMRMLScalarVolumeNode*')
@@ -445,8 +467,8 @@ class LoadCTXWidget:
   def onSetPlanCubeButton(self):
     logic = LoadCTXLogic()
     doseNode = self.selectVolume.currentNode()
-    optDoseValue = self.optDoseBox.value
-    logic.setPlanCube(doseNode,optDoseValue)
+    #optDoseValue = self.optDoseBox.value
+    logic.setPlanCube(doseNode)
     
   def onChangePyhsDoseCheckBox(self):
     if self.pyhsDoseCheckBox.checkState() == 0:
@@ -460,7 +482,7 @@ class LoadCTXWidget:
     logic = LoadCTXLogic()
     sbrtNode = self.selectSBRTDose.currentNode()
     ptNode = self.selectPTDose.currentNode()
-    if not ptNode or not sbrtNode:
+    if not sbrtNode:
       print "No SBRT and/or PT dose!."
       return
     logic.makeDoseDifference(sbrtNode,ptNode)
@@ -468,11 +490,11 @@ class LoadCTXWidget:
   def onSetVOIUnionButton(self):
     logic = LoadCTXLogic()
     voi1Node = self.selectSBRTDose.currentNode()
-    voi2Node = self.selectPTDose.currentNode()
-    if not voi1Node or not voi2Node:
-      print "Input two vois!."
-      return
-    logic.makeVOIUnioun(voi1Node,voi2Node)
+    #voi2Node = self.selectPTDose.currentNode()
+    #if not voi1Node or not voi2Node:
+      #print "Input two vois!."
+      #return
+    logic.makeVOIUnioun(voi1Node)
     
   def onSetCopyOriginButton(self):
     sbrtNode = self.selectSBRTDose.currentNode()
@@ -481,6 +503,15 @@ class LoadCTXWidget:
       print "No SBRT and/or PT dose!."
       return
     ptNode.SetOrigin(sbrtNode.GetOrigin())
+    
+  def onSetAddVecorButton(self):
+    logic = LoadCTXLogic()
+    vector1 = self.selectSBRTDose.currentNode()
+    vector2 = self.selectPTDose.currentNode()
+    if not vector1 or not vector2:
+      print "No SBRT and/or PT dose!."
+      return
+    logic.addVectors(vector1, vector2)
   
 
   def onReload(self,moduleName="LoadCTX"):
@@ -518,17 +549,18 @@ class LoadCTXLogic:
     pass
 
   
-  def loadVoi(self,filePath,motionState=0,voi=None, threeD = False):
-    if voi is not None:
-      if voi.slicerNodeID[motionState] is not None:
-	slicerVolume = slicer.util.getNode(voi.slicerNodeID[motionState])
-	if slicerVolume is not None:
-	  selectionNode = slicer.app.applicationLogic().GetSelectionNode()
-          selectionNode.SetReferenceActiveVolumeID(slicerVolume.GetID())
-          slicer.app.applicationLogic().PropagateVolumeSelection(0)
-          return voi.slicerNodeID[motionState]
-        else:
-	  voi.slicerNodeID[motionState]=None
+  def loadVoi(self,filePath,segmentationNode,motionState=0,voi=None):
+    
+    if not segmentationNode:
+       print "No segmentation node"
+       return
+       
+    
+    segLogic = slicer.modules.segmentations.logic()
+    segLogic.SetMRMLScene(slicer.mrmlScene)
+    voi.slicerNodeID[motionState]=None
+    
+    print "Logic set"
 	  
     if not filePath or not os.path.isfile(filePath):
       print "No file!" + filePath
@@ -536,14 +568,33 @@ class LoadCTXLogic:
       
     volumesLogic = slicer.vtkSlicerVolumesLogic()
     volumesLogic.SetMRMLScene(slicer.mrmlScene)
-    slicerVolumeName = os.path.splitext(os.path.basename(filePath))[0]
-    slicerVolume = volumesLogic.AddArchetypeVolume(filePath,slicerVolumeName,0)
+    slicerVolumeName = os.path.splitext(os.path.basename(filePath))[0] + "_" + str(motionState)
+    slicerVolume = volumesLogic.AddArchetypeVolume(filePath,slicerVolumeName,1) 
     
+    print "File loaded"
+    #success, midV = slicer.util.loadVolume(os.path.basename(filePath), 
+                                           #properties = {'name' : "Helo", 'labelmap' : True}, returnNode = True)
     slicerVolume.SetOrigin(voi.getSlicerOrigin())
     if not slicerVolume:
       print "Can't load volume " + os.path.basename(filePath)
       return None
-      
+    
+    colorNode = slicer.util.getNode("vtkMRMLColorTableNodeFileGenericAnatomyColors.txt")
+    
+    colorIndex = colorNode.GetColorIndexByName(voi.name.lower())
+    
+    color = [1,0,0,1]
+    
+    if colorIndex > -1:
+       colorNode.GetColor(colorIndex,color)
+    
+    displayNode = slicer.vtkMRMLLabelMapVolumeDisplayNode()
+    displayNode.SetAndObserveColorNodeID(colorNode.GetID())
+    displayNode.SetColor(color[0:3])
+    slicer.mrmlScene.AddNode(displayNode)
+    slicerVolume.SetAndObserveDisplayNodeID(displayNode.GetID())
+
+
     try:
        array = slicer.util.array(slicerVolume.GetID())
     except AttributeError:
@@ -552,18 +603,27 @@ class LoadCTXLogic:
       
     array[:] = ( array[:] >> voi.motionStateBit[motionState] ) & 1
     
-    if threeD:
-      if voi:
-	index = voi.voiNumber
-      else:
-	index = 0
-      slicerVolume = self.convertLabelMapToClosedSurfaceModel(slicerVolume, index)
-    else:
-      displayNode = slicer.vtkMRMLScalarVolumeDisplayNode()
-      displayNode.SetAndObserveColorNodeID("vtkMRMLColorTableNodeGrey")
-      slicer.mrmlScene.AddNode(displayNode)
-      slicerVolume.SetAndObserveDisplayNodeID(displayNode.GetID())
-      #slicerVolume.SetLabelMap(1)
+
+    #if not segLogic.ImportLabelmapToSegmentationNode(slicerVolume,segmentationNode):
+       #print "Can't import " + slicerVolume.GetName()
+       #slicer.mrmlScene.RemoveNode(slicerVolume)
+       
+
+       
+    #Color?
+    
+    #if threeD:
+      #if voi:
+	#index = voi.voiNumber
+      #else:
+	#index = 0
+      #slicerVolume = self.convertLabelMapToClosedSurfaceModel(slicerVolume, index)
+    #else:
+      #displayNode = slicer.vtkMRMLScalarVolumeDisplayNode()
+      #displayNode.SetAndObserveColorNodeID("vtkMRMLColorTableNodeGrey")
+      #slicer.mrmlScene.AddNode(displayNode)
+      #slicerVolume.SetAndObserveDisplayNodeID(displayNode.GetID())
+      ##slicerVolume.SetLabelMap(1)
     
                   	  
     if 0:
@@ -638,20 +698,61 @@ class LoadCTXLogic:
         colorNode.SetColor(numberOfColors, pyTRiPCube.patient_name, color[0], color[1], color[2], color[3])
         contourNode.GetDisplayNode().SetColor(color[0:3])
         slicer.mrmlScene.RemoveNode(slicerVolume)
-	
+
     print "Done!"
     return slicerVolume.GetID()
 
   def setVectorField(self, vectorNode):
     spacing = vectorNode.GetSpacing()
+    
     vectorArray = slicer.util.array(vectorNode.GetID())
     
     for i in range(0,3):
-      vectorArray[:,:,:,i] = vectorArray[:,:,:,i] * spacing[i]
+      vectorArray[:,:,:,i] = vectorArray[:,:,:,i] * spacing[i] /2
     vectorNode.GetImageData().Modified()
     print "Finshed!"
     
-  def setDose(self, doseNode, optDose):
+  
+  def addVectors(self, vector1, vector2, name="SumVF"):
+    
+    vectorArray1 = slicer.util.array(vector1.GetID())
+    vectorArray2 = slicer.util.array(vector2.GetID())
+    
+    if len(vectorArray1) == 0 or len(vectorArray2) == 0:
+       print "No vectors!"
+       return
+    
+
+    newImageData = vtk.vtkImageData()
+    newImageData.DeepCopy(vector1.GetImageData())
+    
+    matrix = vtk.vtkMatrix4x4()
+    vector1.GetIJKToRASDirectionMatrix(matrix)
+    
+    newVector = slicer.vtkMRMLVectorVolumeNode()
+    newVector.SetAndObserveImageData(newImageData)
+    slicer.mrmlScene.AddNode( newVector )
+    
+    newVector.SetIJKToRASDirectionMatrix(matrix)
+    newVector.SetOrigin(vector1.GetOrigin())
+    newVector.SetSpacing(vector1.GetSpacing())
+    
+    slicerName = name
+    slicerName = slicer.mrmlScene.GenerateUniqueName(slicerName)         
+    newVector.SetName(slicerName)
+    
+    displayNode = slicer.vtkMRMLVectorVolumeDisplayNode()
+    slicer.mrmlScene.AddNode(displayNode)
+    newVector.SetAndObserveDisplayNodeID(displayNode.GetID())
+    
+    newVectorArray = slicer.util.array(newVector.GetID())
+    print "Adding " + vector1.GetName() + " and " + vector2.GetName()
+    newArray = np.add(vectorArray1, vectorArray2)
+    newVectorArray[:] = newArray[:]
+    newVector.GetImageData().Modified()
+    print "Finished!"
+  
+  def setDose(self, doseNode, optDose, overDoseOff = False):
     #Set attribute
     doseNode.SetAttribute('DicomRtImport.DoseVolume','1')
     
@@ -663,129 +764,193 @@ class LoadCTXLogic:
     if slicerVolumeDisplay:
       slicerVolumeDisplay.AutoWindowLevelOff()
       slicerVolumeDisplay.AutoThresholdOff()
-      colorNode = slicer.util.getNode('GSIStandard')
+      if overDoseOff:
+         colorNode = slicer.util.getNode('GSIStandard_NoOverDose')
+      else:
+         colorNode = slicer.util.getNode('GSIStandard_OverDose')
+         
       if not colorNode:
-        colorNode = self.CreateDefaultGSIColorTable()	    
+        colorNode = self.CreateDefaultGSIColorTable(overDoseOff)	    
       slicerVolumeDisplay.SetAndObserveColorNodeID(colorNode.GetID())
-      slicerVolumeDisplay.SetWindowLevelMinMax(0,round(optDose))
-      #slicerVolumeDisplay.SetWindowLevelMinMax(0,round(optDose*1.05))
-      slicerVolumeDisplay.SetThreshold(1,1200)
+      #slicerVolumeDisplay.SetWindowLevelMinMax(0,round(optDose))
+      slicerVolumeDisplay.SetWindowLevelMinMax(0,1.08*optDose)
+      slicerVolumeDisplay.SetThreshold(0.2,1200)
       slicerVolumeDisplay.ApplyThresholdOn()
     else:
       print "No display node for:"+doseNode.GetName()
       return
   
-  def setPlanCube(self, doseNode, optDose):
+  def setPlanCube(self, doseNode):
+     
+     #Najprej pomnoz vektor, pol pa novga nared.
     doseArray = slicer.util.array(doseNode.GetID())
-    newArray = np.zeros(doseArray.shape)
-    dim = doseArray.shape
-    
-    for z in range(0,dim[0]):
-      print "Slice: " + str(z) +"/" + str(dim[0])
-      for y in range(0,dim[1]):
-        for x in range(0,dim[2]):
-	  value = optDose - doseArray[z][y][x]
-	  if value > 2:
-	    newArray[z][y][x] = value
-	  elif value > 0.1 and value < 2:
-	    newArray[z][y][x] = 2
-
-    importer=LoadCTXLib.vtkImageImportFromArray()
-    importer.SetArray(newArray)
-    
+    for i in range(0,3):
+       doseArray[:,:,:,i] /= doseNode.GetSpacing()[i]
+       
+    doseNode.GetImageData().Modified()
     planCube = slicer.vtkMRMLScalarVolumeNode()
-    planCube.Copy(doseNode)
-    slicerName = 'PlanCube'
-    slicerName = slicer.mrmlScene.GenerateUniqueName(slicerName)         
-    planCube.SetName(slicerName)
-    
     slicer.mrmlScene.AddNode( planCube )
-    planCube.SetAndObserveImageData(importer.GetOutput())
+    storageNode = planCube.CreateDefaultStorageNode()
+    slicer.mrmlScene.AddNode(storageNode)
+    planCube.SetAndObserveStorageNodeID(storageNode.GetID())
     
-    displayNode = slicer.vtkMRMLScalarVolumeDisplayNode()
-    slicer.mrmlScene.AddNode(displayNode)
-    planCube.SetAndObserveDisplayNodeID(displayNode.GetID())
+    imageData = vtk.vtkImageData()
+
+    for i in range(0,3):
+      
+       if i == 0:
+          slicerName = 'Lung022_00_01_x'
+       elif i == 1:
+          slicerName = 'Lung022_00_01_y'
+       elif i == 2:
+          slicerName = 'Lung022_00_01_z'
+          
+         
+       planCube.SetName(slicerName)
+       extract = vtk.vtkImageExtractComponents()
+       extract.SetComponents(i)
+       extract.SetInputData(doseNode.GetImageData())
+       extract.Modified()
+       extract.Update()
+       imageData.DeepCopy(extract.GetOutput())
+       
+       ijkToRAS = vtk.vtkMatrix4x4()
+       doseNode.GetIJKToRASMatrix(ijkToRAS)
+       planCube.SetIJKToRASMatrix(ijkToRAS)
+       planCube.SetAndObserveImageData(imageData)
+
+       if not slicer.util.saveNode(planCube,
+       '/u/kanderle/FC/Lung022/Registration/MidV/'+ planCube.GetName() +
+       ".nhdr"):
+          print "Can't save " + planCube.GetName()
+          
+    doseArray[:,:,:,i] *= doseNode.GetSpacing()[i]
+    doseNode.GetImageData().Modified()
     print "Plan Cube created."
     
-  def makeDoseDifference(self,sbrtNode,ptNode):   
-    sbrtArray = slicer.util.array(sbrtNode.GetID())
-    ptArray = slicer.util.array(ptNode.GetID())
-    if not sbrtArray.shape == ptArray.shape:
-      print "Array dimensions not the same!"
-      print str(sbrtArray.shape) + " vs " + str(ptArray.shape)
-      return
-    #Iterate through array to determain low values, which are removed from display.
-    #Lengthy process
-    newArray = np.zeros(sbrtArray.shape)
-    dim = sbrtArray.shape
+  def makeDoseDifference(self,sbrtNode,ptNode):
+     
+    slope = 0.928
+    intercept = 33
     
+    #Revert slope and intercept
+    intercept = -intercept/slope
+    slope = 1/slope
+    
+    HUlimit = -90
+    
+    CTlimit = HUlimit*slope + intercept
+    print slope
+    print intercept
+    sbrtArray = slicer.util.array(sbrtNode.GetID())
+    
+    dim = sbrtArray.shape
+
     print "Going through array."
-    newArray = sbrtArray - ptArray
     for z in range(0,dim[0]):
       print "Slice: " + str(z) +"/" + str(dim[0])
       for y in range(0,dim[1]):
         for x in range(0,dim[2]):
-	  if abs(sbrtArray[z][y][x]) < 0.01: #and abs(ptArray[z][y][x]) < 0.1:
-	    newArray[z][y][x] = - 500
-	  else:
-	    newArray[z][y][x] = sbrtArray[z][y][x] - ptArray[z][y][x]
-    
-    importer=LoadCTXLib.vtkImageImportFromArray()
-    importer.SetArray(newArray)
-    slicerVolume = slicer.vtkMRMLScalarVolumeNode()
+          if sbrtArray[z][y][x] > CTlimit: #and abs(ptArray[z][y][x]) < 0.1:
+            sbrtArray[z][y][x] = round(sbrtArray[z][y][x] * slope + intercept,0)
 
-    slicerVolume.Copy(sbrtNode)
     
-    slicer.mrmlScene.AddNode( slicerVolume )
-    slicerVolume.SetAndObserveImageData(importer.GetOutput())
+    #sbrtArray = slicer.util.array(sbrtNode.GetID())
+    #ptArray = slicer.util.array(ptNode.GetID())
+    #if not sbrtArray.shape == ptArray.shape:
+      #print "Array dimensions not the same!"
+      #print str(sbrtArray.shape) + " vs " + str(ptArray.shape)
+      #return
+    ##Iterate through array to determain low values, which are removed from display.
+    ##Lengthy process
+    #newArray = np.zeros(sbrtArray.shape)
+    #dim = sbrtArray.shape
     
-    slicerName = 'DoseDifference'
-    slicerName = slicer.mrmlScene.GenerateUniqueName(slicerName)         
-    slicerVolume.SetName(slicerName)
+    #print "Going through array."
+    #newArray = sbrtArray - ptArray
+    #for z in range(0,dim[0]):
+      #print "Slice: " + str(z) +"/" + str(dim[0])
+      #for y in range(0,dim[1]):
+        #for x in range(0,dim[2]):
+	  #if abs(sbrtArray[z][y][x]) < 0.01: #and abs(ptArray[z][y][x]) < 0.1:
+	    #newArray[z][y][x] = - 500
+	  #else:
+	    #newArray[z][y][x] = sbrtArray[z][y][x] - ptArray[z][y][x]
     
-    displayNode = slicer.vtkMRMLScalarVolumeDisplayNode()
-    slicer.mrmlScene.AddNode(displayNode)
-    slicerVolume.SetAndObserveDisplayNodeID(displayNode.GetID())
+    #importer=LoadCTXLib.vtkImageImportFromArray()
+    #importer.SetArray(newArray)
+    #slicerVolume = slicer.vtkMRMLScalarVolumeNode()
 
-    displayNode.AutoWindowLevelOff()
-    displayNode.AutoThresholdOff()
-    displayNode.SetLevel(0)
-    displayNode.SetWindow(30)
-    displayNode.SetThreshold(-24,24)
-    displayNode.ApplyThresholdOn()
+    #slicerVolume.Copy(sbrtNode)
     
-    colorNode = slicer.util.getNode('ColdToHotRainbow')
-    if not colorNode:
-      print "Error, no ColdToHotRainbow node"
-      return
-      #colorNode = self.CreateDefaultHotAndColdColorTable()
-    #else:
-      #self.CorrectColorNode(colorNode)
-    displayNode.SetAndObserveColorNodeID(colorNode.GetID())
+    #slicer.mrmlScene.AddNode( slicerVolume )
+    #slicerVolume.SetAndObserveImageData(importer.GetOutput())
+    
+    #slicerName = 'DoseDifference'
+    #slicerName = slicer.mrmlScene.GenerateUniqueName(slicerName)         
+    #slicerVolume.SetName(slicerName)
+    
+    #displayNode = slicer.vtkMRMLScalarVolumeDisplayNode()
+    #slicer.mrmlScene.AddNode(displayNode)
+    #slicerVolume.SetAndObserveDisplayNodeID(displayNode.GetID())
+
+    #displayNode.AutoWindowLevelOff()
+    #displayNode.AutoThresholdOff()
+    #displayNode.SetLevel(0)
+    #displayNode.SetWindow(30)
+    #displayNode.SetThreshold(-24,24)
+    #displayNode.ApplyThresholdOn()
+    
+    #colorNode = slicer.util.getNode('ColdToHotRainbow')
+    #if not colorNode:
+      #print "Error, no ColdToHotRainbow node"
+      #return
+      ##colorNode = self.CreateDefaultHotAndColdColorTable()
+    ##else:
+      ##self.CorrectColorNode(colorNode)
+    #displayNode.SetAndObserveColorNodeID(colorNode.GetID())
     
     
     print "Finshed!"
     
-  def makeVOIUnioun(self,voi1Node,voi2Node):   
-    voi1Array = slicer.util.array(voi1Node.GetID())
-    voi2Array = slicer.util.array(voi2Node.GetID())
-    if not voi1Array.shape == voi2Array.shape:
-      print "Array dimensions not the same!"
-      print str(voi1Array.shape) + " vs " + str(voi2Array.shape)
-      return
-    #Iterate through array to determain low values, which are removed from display.
-    #Lengthy process
-    newArray = np.zeros(voi1Array.shape)
-    dim = voi1Array.shape
+  def makeVOIUnioun(self,jacNode1):
+    #Cast to int
+    parameters = {}
+    parameters["InputVolume"] = jacNode1.GetID()
+    parameters["OutputVolume"] = jacNode1.GetID()
+    parameters["Type"] = "Int"
+    castVolume= slicer.modules.castscalarvolume
+    slicer.cli.run(castVolume, None, parameters, wait_for_completion=True)
     
-    print "Going through array."
-    #newArray = voi1Array + voi2Array
-    for z in range(0,dim[0]):
-      print "Slice: " + str(z) +"/" + str(dim[0])
-      for y in range(0,dim[1]):
-        for x in range(0,dim[2]):
-	  if voi1Array[z][y][x] == 1 or voi2Array[z][y][x] == 1: #and abs(voi2Array[z][y][x]) < 0.1:
-	    newArray[z][y][x] = 1
+    ##Now byte swap
+    #array = slicer.util.array(jacNode1.GetID())
+    #array[:] = array[:].byteswap()
+    
+    jacNode1.SetName("Pat00Target")
+    
+    print "Finished"
+    
+    return
+    
+    #voi1Array = slicer.util.array(voi1Node.GetID())
+    #voi2Array = slicer.util.array(voi2Node.GetID())
+    #if not voi1Array.shape == voi2Array.shape:
+      #print "Array dimensions not the same!"
+      #print str(voi1Array.shape) + " vs " + str(voi2Array.shape)
+      #return
+    ##Iterate through array to determain low values, which are removed from display.
+    ##Lengthy process
+    #newArray = np.zeros(voi1Array.shape)
+    #dim = voi1Array.shape
+    
+    #print "Going through array."
+    ##newArray = voi1Array + voi2Array
+    #for z in range(0,dim[0]):
+      #print "Slice: " + str(z) +"/" + str(dim[0])
+      #for y in range(0,dim[1]):
+        #for x in range(0,dim[2]):
+	  #if voi1Array[z][y][x] == 1 and voi2Array[z][y][x] == 1: #and abs(voi2Array[z][y][x]) < 0.1:
+	    #newArray[z][y][x] = 1
 
     
     #importer=LoadCTXLib.vtkImageImportFromArray()
@@ -797,7 +962,7 @@ class LoadCTXLogic:
     slicer.mrmlScene.AddNode( slicerVolume )
     #slicerVolume.SetAndObserveImageData(importer.GetOutput())
     
-    slicerName = 'VoiUnion'
+    slicerName = 'VoiCS'
     slicerName = slicer.mrmlScene.GenerateUniqueName(slicerName)         
     slicerVolume.SetName(slicerName)
     
@@ -904,45 +1069,56 @@ class LoadCTXLogic:
  
  
 	
-  def CreateDefaultGSIColorTable(self):
-    colorTableNode = slicer.vtkMRMLColorTableNode()    
-    nodeName = "GSIStandard"
+  def CreateDefaultGSIColorTable(self, overDoseOff):
+    colorTableNode = slicer.vtkMRMLColorTableNode()
+    if overDoseOff:
+       nodeName = "GSIStandard_NoOverDose"
+    else:
+       nodeName = "GSIStandard_OverDose"
     colorTableNode.SetName(nodeName);
     colorTableNode.SetTypeToUser();
     colorTableNode.SetAttribute("Category", "User Generated");
     colorTableNode.HideFromEditorsOn();
     colorTableNode.SetNumberOfColors(256);
     colorTableNode.GetLookupTable().SetTableRange(0,255)
-    #for i in range(0,256):
-      #if i<85:
-        #colorTableNode.AddColor(str(i), 0.06, 0, 1, 0.2)
-      #elif i<128:
-	#colorTableNode.AddColor(str(i), 0, 0.94, 1, 0.2)
-      #elif i<170:
-        #colorTableNode.AddColor(str(i), 0.02, 0.5, 0, 0.2)
-      #elif i<213:
-        #colorTableNode.AddColor(str(i), 0.02, 1, 0, 0.2)
-      #elif i<255:
-        #colorTableNode.AddColor(str(i), 1, 1, 0, 0.2)
-      #else:
-        #colorTableNode.AddColor(str(i), 1, 0, 0, 0.2)
-      #else:
-	#colorTableNode.AddColor(str(i), 1, 0, 1, 1)
-    for i in range(0,256):
-      if i<48:
-        colorTableNode.AddColor(str(i), 0.06, 0, 1, 0.2)
-      elif i<97:
-	colorTableNode.AddColor(str(i), 0, 0.94, 1, 0.2)
-      elif i<145:
-        colorTableNode.AddColor(str(i), 0.02, 0.5, 0, 0.2)
-      elif i<194:
-        colorTableNode.AddColor(str(i), 0.02, 1, 0, 0.2)
-      elif i<230:
-        colorTableNode.AddColor(str(i), 1, 1, 0, 0.2)
-      elif i<255:
-        colorTableNode.AddColor(str(i), 1, 0, 0, 0.2)
-      else:
-	colorTableNode.AddColor(str(i), 1, 0, 1, 1)
+    darkBlue = 47.0
+    lightBlue = 95.0
+    darkGreen = 142.0
+    lightGreen = 189.0
+    yellow = 225.0
+    red = 248.0
+    
+    if overDoseOff:
+       for i in range(0,256):
+         if i>=0 and i<darkBlue:
+           colorTableNode.AddColor(str(i), 0, 0 + i/darkBlue, 1, 0.2)
+         elif i>=darkBlue and i<lightBlue:
+           colorTableNode.AddColor(str(i), 0, 1-0.5*(i-darkBlue)/(lightBlue-darkBlue), 1 - (i-darkBlue)/(lightBlue-darkBlue), 0.2)
+         elif i>=lightBlue and i<darkGreen:
+           colorTableNode.AddColor(str(i), 0, 0.5 + 0.5*(i-lightBlue)/(darkGreen-lightBlue), 0, 0.2)
+         elif i>=darkGreen and i<lightGreen:
+           colorTableNode.AddColor(str(i), 0 + (i-darkGreen)/(lightGreen-darkGreen), 1, 0, 0.2)
+         elif i>=lightGreen and i<236:
+           colorTableNode.AddColor(str(i), 1, 1, 0, 0.2)
+         else:
+           colorTableNode.AddColor(str(i), 1, 0, 0, 0.2)
+    else:
+      for i in range(0,256):
+         if i>=0 and i<darkBlue:
+           colorTableNode.AddColor(str(i), 0, 0 + i/darkBlue, 1, 0.2)
+         elif i>=darkBlue and i<lightBlue:
+           colorTableNode.AddColor(str(i), 0, 1-0.5*(i-darkBlue)/(lightBlue-darkBlue), 1 - (i-darkBlue)/(lightBlue-darkBlue), 0.2)
+         elif i>=lightBlue and i<darkGreen:
+           colorTableNode.AddColor(str(i), 0, 0.5 + 0.5*(i-lightBlue)/(darkGreen-lightBlue), 0, 0.2)
+         elif i>=darkGreen and i<lightGreen:
+           colorTableNode.AddColor(str(i), 0 + (i-darkGreen)/(lightGreen-darkGreen), 1, 0, 0.2)
+         elif i>=lightGreen and i<yellow:
+           colorTableNode.AddColor(str(i), 1, 1, 0, 0.2)
+         elif i<=red:
+           colorTableNode.AddColor(str(i), 1, 0, 0, 0.2)
+         else:
+           colorTableNode.AddColor(str(i), 1, 0, 1, 0.2)
+   
     slicer.mrmlScene.AddNode( colorTableNode )
     return colorTableNode
   

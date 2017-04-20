@@ -25,6 +25,7 @@ class Voi():
     self.d99 = 0
     self.v24Gy = 0
     self.v7Gy = 0
+    self.v95 = 0
     self.dvhTableItems = []
     self.perscDose = 0
     self.perscVolume = 1
@@ -62,9 +63,10 @@ class Voi():
     
   #Function for creating difference between two voi values
   def createVoiDifference(self,voi1,voi2, norm = False):
-    if not voi1.volume == voi2.volume:
-      print "Volumes not the same for: " + self.name
+
     self.volume = voi1.volume
+    #if not voi1.volume == voi2.volume:
+      #print "Volumes not the same for: " + self.name
     
     namesList = ['calcPerscDose','maxDose','meanDose','d10','d30','d99','v24Gy','v7Gy']
     for name in namesList:
@@ -170,6 +172,7 @@ class Voi():
 	self.v24Gy = 0
 	self.v7Gy = 0
 	self.calcPerscDose = 0
+	self.v95 = 0
         return
     self.d10 = self.setValue(10)
     #self.d10 = self.d10*dose
@@ -182,6 +185,13 @@ class Voi():
     index = np.argmin(array)
     self.v24Gy = round(self.y[index],2)
     
+    #Find out volume, which gets 95 %. Important for CTV
+    array = abs(self.x-24*0.95/25)
+    index = np.argmin(array)
+    self.v95 = round(self.y[index],2)
+    if voi.name.find('ctv') > -1:
+       print self.v95
+    
     #Find out volume, which gets 7 Gy. Important for Lungs
     array = abs(self.x-7)
     index = np.argmin(array)
@@ -192,7 +202,9 @@ class Voi():
       calcDose = self.setValue(percentage)
       if calcDose > self.perscDose:
 	self.overOarDose = True
-      self.calcPerscDose = calcDose    
+      self.calcPerscDose = calcDose
+    maxDose = self.setValue(3.5/self.rescaledVolume)
+    self.d30 = maxDose
         
      
   def setValue(self,value):
@@ -290,7 +302,7 @@ class Voi():
     #If you don't know it, or don't need it, just input 0.
     
     
-  def setVolumes(self,patientFlag):
+  def readVolumes(self,patientFlag):
     #Skip target volumes
     if self.name.find('ctv') > -1 or self.name.find('itv') > -1 or self.name.find('ptv') > -1:
       return
@@ -313,15 +325,14 @@ class Voi():
 	if line.split()[0] == self.name.lower():
 	  rescaledVolume = float(line.split()[1])
       
-    
-    if not rescaledVolume == 0:
-      if abs(self.volume-rescaledVolume)/rescaledVolume > 0.1:
-	self.y = np.array(self.y)*self.volume/rescaledVolume
-	self.rescaledVolume = rescaledVolume
+  def setVolumes(self):
+    if self.name.find('ctv') > -1 or self.name.find('itv') > -1 or self.name.find('ptv') > -1:
+      return
+    if not self.rescaledVolume == 0:
+      if abs(self.volume-self.rescaledVolume)/self.rescaledVolume > 0.1:
+	self.y = np.array(self.y)*self.volume/self.rescaledVolume
 
-      
 
-      
   def setName(self,name):
     #self.name = name
     #return
