@@ -5,6 +5,8 @@ import numpy as np
 import time
 
 import LoadCTXLib
+reload(LoadCTXLib)
+import vtkSegmentationCorePython as vtkSegmentationCore
 
 #import binfo
 
@@ -554,8 +556,9 @@ class LoadCTXLogic:
     if not segmentationNode:
        print "No segmentation node"
        return
-       
     
+    
+    binaryLabelmapReprName = vtkSegmentationCore.vtkSegmentationConverter.GetSegmentationBinaryLabelmapRepresentationName()
     segLogic = slicer.modules.segmentations.logic()
     segLogic.SetMRMLScene(slicer.mrmlScene)
     voi.slicerNodeID[motionState]=None
@@ -581,12 +584,16 @@ class LoadCTXLogic:
     
     colorNode = slicer.util.getNode("vtkMRMLColorTableNodeFileGenericAnatomyColors.txt")
     
+    
+    
     colorIndex = colorNode.GetColorIndexByName(voi.name.lower())
     
     color = [1,0,0,1]
     
     if colorIndex > -1:
-       colorNode.GetColor(colorIndex,color)
+       if not colorNode.GetColor(colorIndex,color):
+          print "Can't set color for " + voi.name.lower()
+    
     
     displayNode = slicer.vtkMRMLLabelMapVolumeDisplayNode()
     displayNode.SetAndObserveColorNodeID(colorNode.GetID())
@@ -602,103 +609,16 @@ class LoadCTXLogic:
       sys.stderr.write('Cannot get array.')
       
     array[:] = ( array[:] >> voi.motionStateBit[motionState] ) & 1
+    if colorIndex > -1:
+       array[:] *= colorIndex
+    slicerVolume.GetImageData().Modified()
     
-
-    #if not segLogic.ImportLabelmapToSegmentationNode(slicerVolume,segmentationNode):
-       #print "Can't import " + slicerVolume.GetName()
-       #slicer.mrmlScene.RemoveNode(slicerVolume)
-       
-
-       
-    #Color?
+    if not slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(slicerVolume,segmentationNode):
+       print "Can't load volume in segmentation"
+       return None
     
-    #if threeD:
-      #if voi:
-	#index = voi.voiNumber
-      #else:
-	#index = 0
-      #slicerVolume = self.convertLabelMapToClosedSurfaceModel(slicerVolume, index)
-    #else:
-      #displayNode = slicer.vtkMRMLScalarVolumeDisplayNode()
-      #displayNode.SetAndObserveColorNodeID("vtkMRMLColorTableNodeGrey")
-      #slicer.mrmlScene.AddNode(displayNode)
-      #slicerVolume.SetAndObserveDisplayNodeID(displayNode.GetID())
-      ##slicerVolume.SetLabelMap(1)
     
-                  	  
-    if 0:
-	#This Logic need some work
-	#Create subject Hierarchy
-        ##Copied from SlicerSubjectHierarchyContourSetsPlugin
-        from vtkSlicerSubjectHierarchyModuleMRML import vtkMRMLSubjectHierarchyNode
-        from vtkSlicerContoursModuleLogic import vtkSlicerContoursModuleLogic
-        try:
-          vtkMRMLSubjectHierarchyNode
-          vtkSlicerContoursModuleLogic
-        except AttributeError:
-          import sys
-          sys.stderr.write('Unable to load vtkMRMLSubjectHierarchyNode and vtkSlicerContoursModuleLogic')
-          return
-        subjectNode = vtkMRMLSubjectHierarchyNode()
-        subjectNode.SetName(patientName + '_SubjectHierarchy')
-        subjectNode.SetLevel('Subject')
-        contourSet = slicer.util.getNode('NewContourSet_SubjectHierarchy')
-        if not contourSet:
-          slicer.mrmlScene.AddNode(subjectNode)
-          study = subjectNode.CreateSubjectHierarchyNode(slicer.mrmlScene,subjectNode,'Study','Contour')
-          contourSet = study.CreateSubjectHierarchyNode(slicer.mrmlScene,study,'Series','NewContourSet')
-          contourSet.SetAttribute('DicomRtImport.ContourHierarchy','1')
-      
-        contourNodeHierarchy = contourSet.CreateSubjectHierarchyNode(slicer.mrmlScene,contourSet,'Subseries',pyTRiPCube.patient_name)
-        
-        #cliNode = self.changeScalarVolumeType(slicerVolume,volumeScalarType = 'UnsignedChar')
-        contourNode = vtkSlicerContoursModuleLogic.CreateContourFromRepresentation(slicerVolume)
-        if not contourNode:
-	  print "Can't create Contour node from " + slicerVolume.GetNode()
-	  return
-	  
-	contourNodeHierarchy.SetAttribute('StructureName',pyTRiPCube.patient_name)
-	contourNodeHierarchy.SetAssociatedNodeID(contourNode.GetID())
-	
-	#Set color
-	color = [0,0,0]
-	#CreateColors
-        colorNode = slicer.util.getNode('vtkMRMLColorTableNodeLabels')
-        #color = [0,0,0]
-        colorNode.GetScalarsToColors().GetColor(index, color)
-        print color
-        color.append(1)
-        
-	
-	colorNode = slicer.vtkMRMLColorTableNode()
-	slicer.mrmlScene.AddNode(colorNode)
-	
-	colorNode.SetName('NewContourSet_ColorTable')
-	colorNode.SetAttribute('Category','SlicerRT')
-	colorNode.SetTypeToUser()
-	colorNode.HideFromEditorsOff()
-	colorNode.SetNumberOfColors(2)
-	colorNode.GetLookupTable().SetTableRange(0,1)
-	
-	#color[0:2] = slicerVolume.GetDisplayNode().GetColor()
-	colorNode.AddColor('Background',0.0, 0.0, 0.0, 0.0)
-	colorNode.AddColor('Invalid',0.5,0.5,0.5,1)
-	
-	contourSet.SetNodeReferenceID('contourSetColorTableRef', colorNode.GetID() )
-	
-	if not colorNode:
-	  print "No color node for" + slicerVolume.GetName()
-	  
-	numberOfColors = colorNode.GetNumberOfColors()
-	colorNode.SetNumberOfColors(numberOfColors+1);
-	
-	#lookupTable = vtk.vtkLookupTable()
-	#colorNode.SetLookupTable( lookupTable )
-        colorNode.GetLookupTable().SetTableRange(0, numberOfColors)
-        colorNode.SetColor(numberOfColors, pyTRiPCube.patient_name, color[0], color[1], color[2], color[3])
-        contourNode.GetDisplayNode().SetColor(color[0:3])
-        slicer.mrmlScene.RemoveNode(slicerVolume)
-
+    
     print "Done!"
     return slicerVolume.GetID()
 
@@ -751,6 +671,203 @@ class LoadCTXLogic:
     newVectorArray[:] = newArray[:]
     newVector.GetImageData().Modified()
     print "Finished!"
+  
+  def calculateMotion(self, voi, binfo, segmentationNode, axisOfMotion = False, showPlot = True):
+    # logging.info('Processing started')
+
+    origins = np.zeros([3, 10])
+    relOrigins = np.zeros([3, 10])
+    minmaxAmplitudes = [[-1e3, -1e3, -1e3], [1e3, 1e3, 1e3]]
+    amplitudes = [0, 0, 0]
+
+    refPhase = 0
+
+    #This is the relative difference between planning CT and reference position
+    #Amplitudes are shifted for this value, so we can get an estimate, where is our planning CT in 4DCT
+
+    planOrigins = [0,0,0]
+    #print "planorigins: ", planOrigins
+
+    segment = segmentationNode.GetSegmentByTag()
+    
+    # Propagation in 4D
+    patient.create4DParameters()
+    for i in range(0, voi.N_of_motion_states):
+
+      if not voi.slicerNodeID[i]:
+        binfo=self.binfoList[self.binfoListFile.currentIndex]
+        filePrefix, fileExtension = os.path.splitext(binfo.filePath)
+        filePath = filePrefix + voi.name + ".nrrd"
+        voi.slicerNodeID[i] = self.loadVoi(filePath,segmentationNode, motionState=i,voi=voi)
+        
+      #Create & propagate contour
+      contour = self.getContourFromVoi(voi,segmentationNode)
+      if contour is None:
+        print "Can't get contour for phase " + str(i) + "0 %"
+        continue
+      
+      origins[:, i] = self.getCenterOfMass(contour)
+
+    # Find axis of motion
+    if axisOfMotion:
+      matrix_W = self.findAxisOfMotion(origins)
+      if matrix_W is None:
+        print "Can't calculate axis of motion"
+        return
+      #This is turned off for the moment, because we can't add margins in arbitrary direction
+      origins = np.dot(matrix_W.T, origins)
+      patient.matrix = matrix_W
+
+    #Find relative motion
+    for i in range(voi.N_of_motion_states):
+      relOrigins[:, i] = origins[:, i] - origins[:, refPhase] + relOrigins[:, refPhase]
+
+    # Absolute motion & max & min motion
+    relOrigins = np.vstack([relOrigins, np.zeros([1, voi.N_of_motion_states])])
+    for j in range(voi.N_of_motion_states):
+      amplitude = 0
+      for i in range(0, 3):
+        #Max
+        if relOrigins[i, j] > minmaxAmplitudes[0][i]:
+          minmaxAmplitudes[0][i] = relOrigins[i, j]
+        #Min
+        if relOrigins[i, j] < minmaxAmplitudes[1][i]:
+          minmaxAmplitudes[1][i] = relOrigins[i, j]
+        amplitude += relOrigins[i, j]*relOrigins[i, j]
+      relOrigins[3, j] = np.sqrt(amplitude)
+
+    #Find & save peak-to-peak amplitudes
+    amplitudesTmp = [-1, -1, -1]
+    for j in range(3):
+      amplitudesTmp[j] = abs(minmaxAmplitudes[0][j] - minmaxAmplitudes[1][j])
+      if amplitudesTmp[j] > amplitudes[j]:
+        amplitudes[j] = amplitudesTmp[j]
+
+    print amplitudes
+    # Plot
+    if showPlot:
+      self.plotMotion(relOrigins, contourName)
+
+    print "Calculated motion"
+    return
+    
+  def getContourFromVoi(self,voi,segmentationNode):
+     segment = segmentationNode.GetSegmentByTag()
+  
+  def getCenterOfMass(self,contour):
+      comFilter = vtk.vtkCenterOfMass()
+      comFilter.SetInputData(contour.GetRibbonModelPolyData())
+      comFilter.SetUseScalarsAsWeights(False)
+      comFilter.Update()
+      return comFilter.GetCenter()
+  
+  def plotMotion(self, relOrigins, contourName):
+    ln = slicer.util.getNode(pattern='vtkMRMLLayoutNode*')
+    ln.SetViewArrangement(25)
+
+    # Get the first ChartView node
+    cvn = slicer.util.getNode(pattern='vtkMRMLChartViewNode*')
+
+    # Create arrays of data
+    dn = {}
+    for i in range(0, 4):
+      dn[i] = slicer.mrmlScene.AddNode(slicer.vtkMRMLDoubleArrayNode())
+      a = dn[i].GetArray()
+      a.SetNumberOfTuples(10)
+      for j in range(0,10):
+        a.SetComponent(j, 0, j)
+        a.SetComponent(j, 1, relOrigins[i, j])
+        a.SetComponent(j, 2, 0)
+
+    # Create the ChartNode,
+    cn = slicer.mrmlScene.AddNode(slicer.vtkMRMLChartNode())
+
+    # Add data to the Chart
+    cn.AddArray('L-R', dn[0].GetID())
+    cn.AddArray('A-P', dn[1].GetID())
+    cn.AddArray('I-S', dn[2].GetID())
+    cn.AddArray('abs', dn[3].GetID())
+
+    # Configure properties of the Chart
+    cn.SetProperty('default', 'title','Relative ' + contourName + ' motion')
+    cn.SetProperty('default', 'xAxisLabel', 'phase')
+    cn.SetProperty('default', 'yAxisLabel', 'position [mm]')
+    cn.SetProperty('default', 'showGrid', 'on')
+    cn.SetProperty('default', 'xAxisPad', '1')
+    cn.SetProperty('default', 'showMarkers', 'on')
+
+    cn.SetProperty('L-R', 'color', '#0000ff')
+    cn.SetProperty('A-P', 'color', '#00ff00')
+    cn.SetProperty('I-S', 'color', '#ff0000')
+    cn.SetProperty('abs', 'color', '#000000')
+
+    # Set the chart to display
+    cvn.SetChartNodeID(cn.GetID())
+
+  def findAxisOfMotion(self, origins):
+    #Following guide from: http://sebastianraschka.com/Articles/2014_pca_step_by_step.html
+
+    #scale factor for better display:
+    scale = 100
+
+    #Calculate mean position
+    meanVector = [0, 0 ,0]
+    for i in range(3):
+      meanVector[i] = np.mean(origins[i, :])
+
+
+    #Computing covariance matrix
+    convMatrix = np.cov([origins[0, :], origins[1, :], origins[2, :]])
+
+    #Get eigenvectors
+    eig_val, eig_vec = np.linalg.eig(convMatrix)
+
+    # Make a list of (eigenvalue, eigenvector) tuples
+    eig_pairs = [(np.abs(eig_val[i]), eig_vec[:,i]) for i in range(len(eig_val))]
+
+    # Sort the (eigenvalue, eigenvector) tuples from high to low
+    eig_pairs.sort()
+    # eig_pairs.reverse()
+    matrix_w = np.hstack((eig_pairs[0][1].reshape(3, 1),
+                          eig_pairs[1][1].reshape(3, 1),
+                          eig_pairs[2][1].reshape(3, 1)))
+    print('Matrix W:\n', matrix_w)
+
+    #Create linear transform for contour propagation
+
+    vtkMatrix = vtk.vtkMatrix4x4()
+    transform = slicer.vtkMRMLLinearTransformNode()
+    slicer.mrmlScene.AddNode(transform)
+
+    for i in range(3):
+      for j in range(3):
+        vtkMatrix.SetElement(j, i, matrix_w[i, j])
+
+    transform.SetAndObserveMatrixTransformFromParent(vtkMatrix)
+
+    #Plot eigenvectors from mean position
+    fiducials = slicer.vtkMRMLMarkupsFiducialNode()
+    displayNode = slicer.vtkMRMLMarkupsDisplayNode()
+        # vtkNew<vtkMRMLMarkupsFiducialStorageNode> wFStorageNode;
+    slicer.mrmlScene.AddNode(displayNode)
+    slicer.mrmlScene.AddNode(fiducials)
+    fiducials.SetAndObserveDisplayNodeID(displayNode.GetID())
+    fiducials.AddFiducialFromArray(meanVector, "Mean Position")
+    for i in range(len(eig_vec)):
+      # fiducials.AddFiducialFromArray(meanVector + scale * eig_vec[i], " P " + str(i+1))
+      #Plot ruler
+      ruler = slicer.vtkMRMLAnnotationRulerNode()
+      displayRuler = slicer.vtkMRMLAnnotationLineDisplayNode()
+      displayRuler.SetLabelVisibility(0)
+      displayRuler.SetMaxTicks(0)
+      displayRuler.SetLineWidth(5)
+      slicer.mrmlScene.AddNode(displayRuler)
+      slicer.mrmlScene.AddNode(ruler)
+      ruler.SetAndObserveDisplayNodeID(displayRuler.GetID())
+      ruler.SetPosition1(meanVector)
+      ruler.SetPosition2(meanVector + scale * eig_vec[i])
+
+    return matrix_w  
   
   def setDose(self, doseNode, optDose, overDoseOff = False):
     #Set attribute
