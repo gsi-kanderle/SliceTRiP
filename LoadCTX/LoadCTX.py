@@ -571,7 +571,7 @@ class LoadCTXLogic:
       
     volumesLogic = slicer.vtkSlicerVolumesLogic()
     volumesLogic.SetMRMLScene(slicer.mrmlScene)
-    slicerVolumeName = os.path.splitext(os.path.basename(filePath))[0] + "_" + str(motionState)
+    slicerVolumeName = os.path.splitext(voi.name + "_" + str(motionState-1)
     slicerVolume = volumesLogic.AddArchetypeVolume(filePath,slicerVolumeName,1) 
     
     print "File loaded"
@@ -613,7 +613,7 @@ class LoadCTXLogic:
        array[:] *= colorIndex
     slicerVolume.GetImageData().Modified()
     
-    if not slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(slicerVolume,segmentationNode):
+    if not slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(slicerVolume,segmentationNode,0,):
        print "Can't load volume in segmentation"
        return None
     
@@ -675,22 +675,16 @@ class LoadCTXLogic:
   def calculateMotion(self, voi, binfo, segmentationNode, axisOfMotion = False, showPlot = True):
     # logging.info('Processing started')
 
-    origins = np.zeros([3, 10])
-    relOrigins = np.zeros([3, 10])
+    origins = np.zeros([3, voi.N_of_motion_states])
+    relOrigins = np.zeros([3, voi.N_of_motion_states])
     minmaxAmplitudes = [[-1e3, -1e3, -1e3], [1e3, 1e3, 1e3]]
     amplitudes = [0, 0, 0]
 
     refPhase = 0
-
-    #This is the relative difference between planning CT and reference position
-    #Amplitudes are shifted for this value, so we can get an estimate, where is our planning CT in 4DCT
-
     planOrigins = [0,0,0]
     #print "planorigins: ", planOrigins
 
-    segment = segmentationNode.GetSegmentByTag()
-    
-    # Propagation in 4D
+    # Load all 4D contours
     patient.create4DParameters()
     for i in range(0, voi.N_of_motion_states):
 
@@ -698,10 +692,12 @@ class LoadCTXLogic:
         binfo=self.binfoList[self.binfoListFile.currentIndex]
         filePrefix, fileExtension = os.path.splitext(binfo.filePath)
         filePath = filePrefix + voi.name + ".nrrd"
-        voi.slicerNodeID[i] = self.loadVoi(filePath,segmentationNode, motionState=i,voi=voi)
+        voi.slicerNodeID[i] = self.loadVoi(filePath,segmentationNode, motionState=i+1,voi=voi)
         
+    #Get representation and origins from all states
+    for i in range(0, voi.N_of_motion_states):
       #Create & propagate contour
-      contour = self.getContourFromVoi(voi,segmentationNode)
+      contour = self.getContourFromVoi(voi,segmentationNode,i)
       if contour is None:
         print "Can't get contour for phase " + str(i) + "0 %"
         continue
@@ -751,8 +747,11 @@ class LoadCTXLogic:
     print "Calculated motion"
     return
     
-  def getContourFromVoi(self,voi,segmentationNode):
-     segment = segmentationNode.GetSegmentByTag()
+  def getContourFromVoi(self,voi,segmentationNode,motionState):
+     segmentationNode.CreateRepresentation('Closed Surface')
+     segmentationID = voi.name + str(motionState)
+     segment = segmentationNode.GetSegment(segmentationID)
+     return segment.GetRepresentation('Closed Surface')
   
   def getCenterOfMass(self,contour):
       comFilter = vtk.vtkCenterOfMass()
