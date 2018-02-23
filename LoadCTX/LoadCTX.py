@@ -539,7 +539,11 @@ class LoadCTXLogic:
       
     volumesLogic = slicer.vtkSlicerVolumesLogic()
     volumesLogic.SetMRMLScene(slicer.mrmlScene)
+<<<<<<< HEAD
     slicerVolumeName = voi.name + "_" + str(motionState)
+=======
+    slicerVolumeName = os.path.splitext(voi.name + "_" + str(motionState-1)
+>>>>>>> c74b47829dfa76e290ecd77b049abeb7281d76b9
     slicerVolume = volumesLogic.AddArchetypeVolume(filePath,slicerVolumeName,1) 
     #success, midV = slicer.util.loadVolume(os.path.basename(filePath), 
                                            #properties = {'name' : "Helo", 'labelmap' : True}, returnNode = True)
@@ -580,7 +584,12 @@ class LoadCTXLogic:
     if colorIndex > -1:
        array[:] *= colorIndex
     slicerVolume.GetImageData().Modified()
+<<<<<<< HEAD
     if not slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(slicerVolume,segmentationNode):
+=======
+    
+    if not slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(slicerVolume,segmentationNode,0,):
+>>>>>>> c74b47829dfa76e290ecd77b049abeb7281d76b9
        print "Can't load volume in segmentation"
        return None
     else:
@@ -697,6 +706,7 @@ class LoadCTXLogic:
   def calculateMotion(self, voi, binfo, segmentationNode, axisOfMotion = False, showPlot = True):
     # logging.info('Processing started')
 
+<<<<<<< HEAD
     origins = np.zeros([3, voi.N_of_motion_states-1])
     relOrigins = np.zeros([4, voi.N_of_motion_states-1])
     minmaxAmplitudes = [[-1e3, -1e3, -1e3], [1e3, 1e3, 1e3]]
@@ -713,10 +723,25 @@ class LoadCTXLogic:
 
     # Propagation in 4D
     for i in range(1, voi.N_of_motion_states):
+=======
+    origins = np.zeros([3, voi.N_of_motion_states])
+    relOrigins = np.zeros([3, voi.N_of_motion_states])
+    minmaxAmplitudes = [[-1e3, -1e3, -1e3], [1e3, 1e3, 1e3]]
+    amplitudes = [0, 0, 0]
+
+    refPhase = 0
+    planOrigins = [0,0,0]
+    #print "planorigins: ", planOrigins
+
+    # Load all 4D contours
+    patient.create4DParameters()
+    for i in range(0, voi.N_of_motion_states):
+>>>>>>> c74b47829dfa76e290ecd77b049abeb7281d76b9
 
       if not voi.slicerNodeID[i]:
         filePrefix, fileExtension = os.path.splitext(binfo.filePath)
         filePath = filePrefix + voi.name + ".nrrd"
+<<<<<<< HEAD
         voi.slicerNodeID[i] = self.loadVoi(filePath,segmentationNode, motionState=i,voi=voi)
      
     for i in range(1, voi.N_of_motion_states):
@@ -725,6 +750,14 @@ class LoadCTXLogic:
       segmentation.CreateRepresentation('Closed surface')
       voiName = voi.name + "_" + str(i)
       contour = self.getContourFromVoi(voiName,segmentation)
+=======
+        voi.slicerNodeID[i] = self.loadVoi(filePath,segmentationNode, motionState=i+1,voi=voi)
+        
+    #Get representation and origins from all states
+    for i in range(0, voi.N_of_motion_states):
+      #Create & propagate contour
+      contour = self.getContourFromVoi(voi,segmentationNode,i)
+>>>>>>> c74b47829dfa76e290ecd77b049abeb7281d76b9
       if contour is None:
         #print "Can't get contour  " + str(i) + "0 %"
         continue
@@ -807,6 +840,7 @@ class LoadCTXLogic:
     print "Calculated motion"
     return
     
+<<<<<<< HEAD
   def getContourFromVoi(self,voiName,segmentation):
      segment = segmentation.GetSegment(voiName)
      if segment is None:
@@ -814,6 +848,13 @@ class LoadCTXLogic:
         return None
         
      return segment.GetRepresentation('Closed surface')
+=======
+  def getContourFromVoi(self,voi,segmentationNode,motionState):
+     segmentationNode.CreateRepresentation('Closed Surface')
+     segmentationID = voi.name + str(motionState)
+     segment = segmentationNode.GetSegment(segmentationID)
+     return segment.GetRepresentation('Closed Surface')
+>>>>>>> c74b47829dfa76e290ecd77b049abeb7281d76b9
   
   def getCenterOfMass(self,contour):
       comFilter = vtk.vtkCenterOfMass()
