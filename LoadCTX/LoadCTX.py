@@ -1,98 +1,53 @@
 import os, re
 import unittest
-from __main__ import vtk, qt, ctk, slicer
+import vtk, qt, ctk, slicer
+from slicer.ScriptedLoadableModule import *
+import logging
 import numpy as np
-import time
-
 import LoadCTXLib
 reload(LoadCTXLib)
 import vtkSegmentationCorePython as vtkSegmentationCore
-
-#import binfo
-
 #
 # LoadCTX
 #
 
-class LoadCTX:
+class LoadCTX(ScriptedLoadableModule):
+  """Uses ScriptedLoadableModule base class, available at:
+  https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
+  """
+
   def __init__(self, parent):
-    parent.title = "Load TRiP Volume" # TODO make this more human readable by adding spaces
-    parent.categories = ["SliceTRiP"]
-    parent.dependencies = []
-    parent.contributors = ["Kristjan Anderle (GSI)"] # replace with "Firstname Lastname (Org)"
-    parent.helpText = """
-    This is a module for loading binfo files and setting colormap to GSI Standard for Dose.
-    """
-    parent.acknowledgementText = """
-    This was developed for better representation of binfo files..
+    ScriptedLoadableModule.__init__(self, parent)
+    self.parent.title = "Load TRiP Volume" # TODO make this more human readable by adding spaces
+    self.parent.categories = ["SliceTRiP"]
+    self.parent.dependencies = []
+    self.parent.contributors = ["Kristjan Anderle (GSI)"] # replace with "Firstname Lastname (Organization)"
+    self.parent.helpText = """
+This is a module for loading binfo files and setting colormap to GSI Standard for Dose.
+"""
+    self.parent.helpText += self.getDefaultModuleDocumentationLink()
+    self.parent.acknowledgementText = """
+This file was originally developed by Jean-Christophe Fillion-Robin, Kitware Inc.
+and Steve Pieper, Isomics, Inc. and was partially funded by NIH grant 3P41RR013218-12S1.
 """ # replace with organization, grant and thanks.
-    #parent.icon = qt.QIcon(':Icons/XLarge/SlicerDownloadMRHead.png')
-    self.parent = parent
-    #reload(binfo)
-
-    # Add this test to the SelfTest module's list for discovery when the module
-    # is created.  Since this module may be discovered before SelfTests itself,
-    # create the list if it doesn't already exist.
-    try:
-      slicer.selfTests
-    except AttributeError:
-      slicer.selfTests = {}
-    slicer.selfTests['LoadCTX'] = self.runTest
-
-  def runTest(self):
-    tester = LoadCTXTest()
-    tester.runTest()
 
 #
-# qLoadCTXWidget
+# LoadCTXWidget
 #
 
-class LoadCTXWidget:
-  def __init__(self, parent = None):
-    if not parent:
-      self.parent = slicer.qMRMLWidget()
-      self.parent.setLayout(qt.QVBoxLayout())
-      self.parent.setMRMLScene(slicer.mrmlScene)
-    else:
-      self.parent = parent
-    self.layout = self.parent.layout()
-    if not parent:
-      self.setup()
-      self.parent.show()
+class LoadCTXWidget(ScriptedLoadableModuleWidget):
+  """Uses ScriptedLoadableModuleWidget base class, available at:
+  https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
+  """
 
   def setup(self):
+    ScriptedLoadableModuleWidget.setup(self)
+
     # Instantiate and connect widgets ...
-
-    #
-    # Reload and Test area
-    #
-    reloadCollapsibleButton = ctk.ctkCollapsibleButton()
-    reloadCollapsibleButton.text = "Reload && Test"
-    self.layout.addWidget(reloadCollapsibleButton)
-    reloadFormLayout = qt.QFormLayout(reloadCollapsibleButton)
-
-    # reload button
-    # (use this during development, but remove it when delivering
-    #  your module to users)
-    self.reloadCTXButton = qt.QPushButton("Reload")
-    self.reloadCTXButton.toolTip = "Reload this module."
-    self.reloadCTXButton.name = "LoadCTX Reload"
-    reloadFormLayout.addWidget(self.reloadCTXButton)
-    self.reloadCTXButton.connect('clicked()', self.onReload)
-
-    # reload and test button
-    # (use this during development, but remove it when delivering
-    #  your module to users)
-    self.reloadAndTestButton = qt.QPushButton("Reload and Test")
-    self.reloadAndTestButton.toolTip = "Reload this module and then run the self tests."
-    reloadFormLayout.addWidget(self.reloadAndTestButton)
-    self.reloadAndTestButton.connect('clicked()', self.onReloadAndTest)
 
     #
     # Parameters Area
     #
-    
-    
     binfoCollapsibleButton = ctk.ctkCollapsibleButton()
     binfoCollapsibleButton.text = "LoadBinfo"
     self.layout.addWidget(binfoCollapsibleButton)
@@ -109,16 +64,6 @@ class LoadCTXWidget:
     
     binfoFormLayout.addRow(self.loadButton)
     
-    #TODO: Daj opcijo, da se izbere doza in potem se zravn checkbox, zato da zberes, al ti normira na to al ne.
-    # Optimized dose:
-    #self.optDose = qt.QDoubleSpinBox()     
-    #self.optDose.setToolTip( "Optimized dose value." )
-    #self.optDose.setValue(25)
-    #self.optDose.setRange(0, 100)
-    #self.optDose.enabled = True
-    #binfoFormLayout.addRow("Dose:", self.optDose)
-   
-   
     # Binfo
     self.binfoListFile = qt.QComboBox()    
     self.binfoListFile.setToolTip( "Input file" )
@@ -145,6 +90,10 @@ class LoadCTXWidget:
     self.show3DButton = qt.QPushButton("Load VOI")
     self.show3DButton.enabled = False
     self.buttonForm.addWidget(self.show3DButton,0,0)
+    
+    self.calculateMotionButton = qt.QPushButton("Calculate Motion")
+    self.calculateMotionButton.enabled = False
+    self.buttonForm.addWidget(self.calculateMotionButton,0,1)
     binfoFormLayout.addRow(self.buttonForm)
     
     
@@ -294,13 +243,14 @@ class LoadCTXWidget:
     #
     # Add vector volumes Button
     #
-    self.setAddVecorButton = qt.QPushButton("Add two vector volumes")
+    self.setAddVecorButton = qt.QPushButton("Random Script")
     self.setAddVecorButton.toolTip = "Set origins to zero."
     self.setAddVecorButton.enabled = True
     doseDifferenceLayout.addRow(self.setAddVecorButton)
     
     # connections
     self.show3DButton.connect('clicked(bool)', self.onShow3DButton)
+    self.calculateMotionButton.connect('clicked(bool)', self.onCalculateMotionButton)
     self.setOriginButton.connect('clicked(bool)', self.onSetOriginButton)
     self.setPlanCubeButton.connect('clicked(bool)', self.onSetPlanCubeButton)
     self.loadButton.connect('clicked(bool)', self.onLoadButton)
@@ -340,70 +290,80 @@ class LoadCTXWidget:
       self.setDoseColorButton.enabled = True
       self.setPlanCubeButton.enabled = False
       
-  #Load Binfo in Slicer
   def onLoadButton(self): 
-    logic = LoadCTXLogic()  
     loadFileName = qt.QFileDialog()
-    #loadFileName.setFileMode(loadFileName.AnyFile)
-    #loadFileName.setFilter("Text files (*.txt)")
-    #loadFileName.setNameFilter("Images (*.png *.xpm *.jpg)");
-    filePathList=loadFileName.getOpenFileNames(caption = "Helo")
+    filePathList=loadFileName.getOpenFileNames(None,"Select Binfo File","","Binfo (*.binfo)")
     for filePath in filePathList:
-      filePrefix, fileExtension = os.path.splitext(filePath)
-      if fileExtension == ".binfo":
-	self.voiComboBox.clear()
-	self.motionStateComboBox.clear() 
-	binfo = LoadCTXLib.Binfo()
-	binfo.readFile(filePath)
-	self.binfoList.append( binfo )
-	self.binfoListFile.addItem( binfo.name )
-	#self.setBinfoFile(-1)
-	#self.binfoListFile.setCurrentIndex(-1)
-	self.binfoListFile.enabled = True
-	
-	#Create segmentation node for this binfo
-	segmentationNode = slicer.vtkMRMLSegmentationNode()
-	segmentationNode.SetName(os.path.basename(filePrefix))
-	slicer.mrmlScene.AddNode(segmentationNode)
-	self.segmentationList.append(segmentationNode)
-	
-	displayNode = slicer.vtkMRMLSegmentationDisplayNode()
-	slicer.mrmlScene.AddNode(displayNode)
-	segmentationNode.SetAndObserveDisplayNodeID(displayNode.GetID())
-	
-	storageNode = slicer.vtkMRMLSegmentationStorageNode()
-	slicer.mrmlScene.AddNode(storageNode)
-        segmentationNode.SetAndObserveStorageNodeID(storageNode.GetID())
-		
-	#for voiName in binfo.get_voi_names():
-	  #voi = binfo.get_voi_by_name(voiName)
-	  #self.voiComboBox.addItem(voiName)
-	  #self.setMotionStates(voi)
-	  
-	#self.voiComboBox.enabled = True
-	#self.motionStateComboBox.enabled = True
-		
-      else:
-	if not filePath == '':
-	  qt.QMessageBox.critical(
-	    slicer.util.mainWindow(),
-	    'Load TRiP Cube', 'Unknown file type: ' + fileExtension)
-      
-
+      self.loadBinfo(filePath)
+  
+  #Load Binfo in Slicer
+  def loadBinfo(self,filePath):
+     filePrefix, fileExtension = os.path.splitext(filePath)
+     if not fileExtension == ".binfo":
+        print "Error, file not a binfo file: " + filePath
+     self.voiComboBox.clear()
+     self.motionStateComboBox.clear() 
+     binfo = LoadCTXLib.Binfo()
+     binfo.readFile(filePath)
+     self.binfoList.append( binfo )
+     self.binfoListFile.addItem( binfo.name )
+     self.setBinfoFile(-1)
+     self.binfoListFile.setCurrentIndex(self.binfoListFile.count - 1)
+     self.binfoListFile.enabled = True
+     
+     #Create segmentation node for this binfo
+     patName = os.path.basename(filePrefix)
+     
+     shNode = slicer.util.getNode('SubjectHierarchy')
+     patID = shNode.GetItemChildWithName(shNode.GetSceneItemID(),patName)
+     if patID < 1:
+        patID = shNode.CreateSubjectItem(shNode.GetSceneItemID(), patName);
+        
+     folderID = shNode.GetItemChildWithName(patID, "Contour")
+     if folderID < 1:
+        folderID = shNode.CreateFolderItem(patID, "Contour");
+        
+     name = slicer.mrmlScene.GenerateUniqueName(patName)
+     segmentationNode = slicer.vtkMRMLSegmentationNode()
+     segmentationNode.SetName(name)
+     slicer.mrmlScene.AddNode(segmentationNode)
+     
+     segmentationNodeID = shNode.GetItemByDataNode(segmentationNode)
+     shNode.SetItemParent(segmentationNodeID, folderID)
+        
+     displayNode = slicer.vtkMRMLSegmentationDisplayNode()
+     slicer.mrmlScene.AddNode(displayNode)
+     segmentationNode.SetAndObserveDisplayNodeID(displayNode.GetID())
+     
+     displayNode.SetAllSegmentsVisibility2DFill(False)
+     displayNode.SetSliceIntersectionThickness(3)
+     
+     storageNode = slicer.vtkMRMLSegmentationStorageNode()
+     slicer.mrmlScene.AddNode(storageNode)
+     segmentationNode.SetAndObserveStorageNodeID(storageNode.GetID())
+     
+     self.segmentationList.append(segmentationNode)
+     
   def setBinfoFile(self, binfoNumber):
     self.voiComboBox.clear()
     self.motionStateComboBox.clear()
     binfo = self.binfoList[binfoNumber]
     
     #self.binfoListFile.setCurrentIndex[binfoNumber]
-    for voiName in binfo.get_voi_names():
-      voi = binfo.get_voi_by_name(voiName)
-      self.voiComboBox.addItem(voiName)
-      self.setMotionStates(voi)
-	  
+    voiNames = binfo.get_voi_names()
+    if voiNames == []:
+       print "No names in " + binfo.name
+    else:
+       for voiName in voiNames:
+         voi = binfo.get_voi_by_name(voiName)
+         if voi:
+            self.voiComboBox.addItem(voiName)
+            self.setMotionStates(voi)
+          
     self.voiComboBox.enabled = True
     self.motionStateComboBox.enabled = True
     self.show3DButton.enabled = True
+    
   
   def setMotionStatesFromComboBox(self,voiName):
     binfo = self.binfoList[self.binfoListFile.currentIndex]
@@ -413,17 +373,22 @@ class LoadCTXWidget:
   
   #Find out motion states from binfo file
   def setMotionStates(self,voi): 
-    if voi is not None:
-      self.motionStateComboBox.clear()
-      motionStates=voi.N_of_motion_states
-      for i in range(0,motionStates):
-        self.motionStateComboBox.addItem(voi.motionStateDescription[i])
+    if voi is None:
+       print "No voi"
+       return
+    self.motionStateComboBox.clear()
+    motionStates=voi.N_of_motion_states
+    #We need at least 3 motion states - reference + two motion states
+    if motionStates > 2:
+       self.calculateMotionButton.enabled = True
     else:
-      print "Error, no voi."
+       self.calculateMotionButton.enabled = False
+    for i in range(0,motionStates):
+      self.motionStateComboBox.addItem(voi.motionStateDescription[i])
 
  
   def onShow3DButton(self):
-    binfo=self.binfoList[self.binfoListFile.currentIndex]
+    binfo = self.binfoList[self.binfoListFile.currentIndex]
     segmentationNode = self.segmentationList[self.binfoListFile.currentIndex]
     filePrefix, fileExtension = os.path.splitext(binfo.filePath)
     voi = binfo.get_voi_by_name(self.voiComboBox.currentText)
@@ -435,6 +400,13 @@ class LoadCTXWidget:
     n=self.motionStateComboBox.currentIndex
     voi.slicerNodeID[n]=logic.loadVoi(filePath,segmentationNode, motionState=n,voi=voi)
 
+  def onCalculateMotionButton(self):
+     binfo = self.binfoList[self.binfoListFile.currentIndex]
+     segmentationNode = self.segmentationList[self.binfoListFile.currentIndex]
+     voi = binfo.get_voi_by_name(self.voiComboBox.currentText)
+     logic = LoadCTXLogic()
+     logic.calculateMotion(voi, binfo, segmentationNode, axisOfMotion = False, showPlot = True)
+  
   def onSetVectorFieldButton(self):
     logic = LoadCTXLogic()
     vectorNode = self.selectVolume.currentNode()
@@ -507,13 +479,9 @@ class LoadCTXWidget:
     ptNode.SetOrigin(sbrtNode.GetOrigin())
     
   def onSetAddVecorButton(self):
+    sbrtNode = self.selectSBRTDose.currentNode()
     logic = LoadCTXLogic()
-    vector1 = self.selectSBRTDose.currentNode()
-    vector2 = self.selectPTDose.currentNode()
-    if not vector1 or not vector2:
-      print "No SBRT and/or PT dose!."
-      return
-    logic.addVectors(vector1, vector2)
+    logic.addVectors(sbrtNode)
   
 
   def onReload(self,moduleName="LoadCTX"):
@@ -558,23 +526,21 @@ class LoadCTXLogic:
        return
     
     
-    binaryLabelmapReprName = vtkSegmentationCore.vtkSegmentationConverter.GetSegmentationBinaryLabelmapRepresentationName()
+    if voi.slicerNodeID[motionState]:
+       return voi.slicerNodeID[motionState]
+    
+    #binaryLabelmapReprName = vtkSegmentationCore.vtkSegmentationConverter.GetSegmentationBinaryLabelmapRepresentationName()
     segLogic = slicer.modules.segmentations.logic()
     segLogic.SetMRMLScene(slicer.mrmlScene)
     voi.slicerNodeID[motionState]=None
-    
-    print "Logic set"
-	  
     if not filePath or not os.path.isfile(filePath):
       print "No file!" + filePath
       return None
       
     volumesLogic = slicer.vtkSlicerVolumesLogic()
     volumesLogic.SetMRMLScene(slicer.mrmlScene)
-    slicerVolumeName = os.path.splitext(os.path.basename(filePath))[0] + "_" + str(motionState)
+    slicerVolumeName = voi.name + "_" + str(motionState)
     slicerVolume = volumesLogic.AddArchetypeVolume(filePath,slicerVolumeName,1) 
-    
-    print "File loaded"
     #success, midV = slicer.util.loadVolume(os.path.basename(filePath), 
                                            #properties = {'name' : "Helo", 'labelmap' : True}, returnNode = True)
     slicerVolume.SetOrigin(voi.getSlicerOrigin())
@@ -583,18 +549,20 @@ class LoadCTXLogic:
       return None
     
     colorNode = slicer.util.getNode("vtkMRMLColorTableNodeFileGenericAnatomyColors.txt")
-    
-    
-    
     colorIndex = colorNode.GetColorIndexByName(voi.name.lower())
+    color = [0,0,0,1]
     
-    color = [1,0,0,1]
-    
-    if colorIndex > -1:
-       if not colorNode.GetColor(colorIndex,color):
-          print "Can't set color for " + voi.name.lower()
-    
-    
+    if colorIndex < 2:
+       colorNode = slicer.util.getNode("vtkMRMLColorTableNodeLabels")
+       colorIndex = colorNode.GetColorIndexByName("dylan")
+       
+    if not colorNode.GetColor(colorIndex,color):
+       print "Can't set color for " + voi.name.lower()
+       color = [0,0,0,1]
+       #colorIndex = colorNode.GetColorIndexByName("region 11")
+       
+    #print colorIndex
+
     displayNode = slicer.vtkMRMLLabelMapVolumeDisplayNode()
     displayNode.SetAndObserveColorNodeID(colorNode.GetID())
     displayNode.SetColor(color[0:3])
@@ -612,10 +580,11 @@ class LoadCTXLogic:
     if colorIndex > -1:
        array[:] *= colorIndex
     slicerVolume.GetImageData().Modified()
-    
     if not slicer.vtkSlicerSegmentationsModuleLogic.ImportLabelmapToSegmentationNode(slicerVolume,segmentationNode):
        print "Can't load volume in segmentation"
        return None
+    else:
+       print "Added " + slicerVolume.GetName() + " to " + segmentationNode.GetName()
     
     
     
@@ -628,59 +597,113 @@ class LoadCTXLogic:
     vectorArray = slicer.util.array(vectorNode.GetID())
     
     for i in range(0,3):
-      vectorArray[:,:,:,i] = vectorArray[:,:,:,i] * spacing[i] /2
+      vectorArray[:,:,:,i] = vectorArray[:,:,:,i] * spacing[i]
     vectorNode.GetImageData().Modified()
     print "Finshed!"
     
   
-  def addVectors(self, vector1, vector2, name="SumVF"):
+  def addVectors(self,node):
     
-    vectorArray1 = slicer.util.array(vector1.GetID())
-    vectorArray2 = slicer.util.array(vector2.GetID())
+    nodeArray = slicer.util.array(node.GetID())
     
-    if len(vectorArray1) == 0 or len(vectorArray2) == 0:
-       print "No vectors!"
-       return
+    maxDose = nodeArray.max()
+    minDose = np.min(nodeArray[np.nonzero(nodeArray)])
     
+    dim = nodeArray.shape
+    
+    nodeArray[:] = nodeArray[:]/maxDose
+    
+    #for z in range(0,dim[0]):
+      #print "Slice: " + str(z) +"/" + str(dim[0])
+      #for y in range(0,dim[1]):
+        #for x in range(0,dim[2]):
+          #if nodeArray[z][y][x] > 0.2*maxDose:
+             #pass
+            ##nodeArray[z][y][x] = np.log(nodeArray[z][y][x]/minDose)/np.log(maxDose/minDose)
+          #else:
+            #nodeArray[z][y][x] = -100
+            
+    node.GetImageData().Modified()
+    print "Voila"
+    return
+    
+    
+    refPhase = 5
+    numberOfPhases = 8
+    filePath = "/u/kanderle/AIXd/Data/CNAO/Liver/ManualContour/"
+    name = "liver_"
+    ext = ".mha"
+    phaseList = ["00","12","25","37","50","62","75","87"]
+    
+    phaseContourFile = filePath + name + phaseList[refPhase-1] + ext
+    if not os.path.isfile(phaseContourFile):
+         print "No file " + phaseContourFile
+         return
+    success, phaseNode = slicer.util.loadVolume(phaseContourFile, 
+                                           properties = {'labelmap' : True}, returnNode = True)
 
+    #Refphase first
+    newNode = slicer.vtkMRMLScalarVolumeNode()
+    newNode.SetName('Merged')
+    
     newImageData = vtk.vtkImageData()
-    newImageData.DeepCopy(vector1.GetImageData())
+    newImageData.DeepCopy( phaseNode.GetImageData() )
+    newNode.SetAndObserveImageData( newImageData )
     
-    matrix = vtk.vtkMatrix4x4()
-    vector1.GetIJKToRASDirectionMatrix(matrix)
+    newNode.SetSpacing( phaseNode.GetSpacing() )
+    newNode.SetOrigin( phaseNode.GetOrigin() )
     
-    newVector = slicer.vtkMRMLVectorVolumeNode()
-    newVector.SetAndObserveImageData(newImageData)
-    slicer.mrmlScene.AddNode( newVector )
+    slicer.mrmlScene.AddNode( newNode )
+
+    parameters = {}
+    parameters["InputVolume"] = newNode.GetID()
+    parameters["OutputVolume"] = newNode.GetID()
+    parameters["Type"] = "Int"
+    castVolume= slicer.modules.castscalarvolume
+    slicer.cli.run(castVolume, None, parameters, wait_for_completion=True)
     
-    newVector.SetIJKToRASDirectionMatrix(matrix)
-    newVector.SetOrigin(vector1.GetOrigin())
-    newVector.SetSpacing(vector1.GetSpacing())
+    newArray = slicer.util.array( newNode.GetID() )
     
-    slicerName = name
-    slicerName = slicer.mrmlScene.GenerateUniqueName(slicerName)         
-    newVector.SetName(slicerName)
+    newNode.CreateDefaultDisplayNodes()
+    storage = newNode.CreateDefaultStorageNode()
+    slicer.mrmlScene.AddNode( storage )
+    newNode.SetAndObserveStorageNodeID( storage.GetID() )
     
-    displayNode = slicer.vtkMRMLVectorVolumeDisplayNode()
-    slicer.mrmlScene.AddNode(displayNode)
-    newVector.SetAndObserveDisplayNodeID(displayNode.GetID())
+    if len(newArray) == 0:
+      print "No new array for phase " + phase
+      return
     
-    newVectorArray = slicer.util.array(newVector.GetID())
-    print "Adding " + vector1.GetName() + " and " + vector2.GetName()
-    newArray = np.add(vectorArray1, vectorArray2)
-    newVectorArray[:] = newArray[:]
-    newVector.GetImageData().Modified()
-    print "Finished!"
-  
+    for phase in range(1,len(phaseList)+1):
+
+      phaseContourFile = filePath + name + phaseList[phase-1] + ext
+      if not os.path.isfile(phaseContourFile):
+         print "No file " + phaseContourFile
+         return
+      success, phaseNode = slicer.util.loadVolume(phaseContourFile, 
+                                           properties = {'labelmap' : True}, returnNode = True)
+      if not success:
+         print "Can't load file " + phaseContourFile
+         return
+      
+      arrayPhase = slicer.util.array(phaseNode.GetID())
+      if len(arrayPhase) == 0:
+         print "No array for phase " + phase
+         return
+      print "Adding bit: " + str(phase) + " ( " + str(1<<phase) + " )"
+      newArray[:] |= ( arrayPhase[:] << phase )
+
+    print "Finished"
+
   def calculateMotion(self, voi, binfo, segmentationNode, axisOfMotion = False, showPlot = True):
     # logging.info('Processing started')
 
-    origins = np.zeros([3, 10])
-    relOrigins = np.zeros([3, 10])
+    origins = np.zeros([3, voi.N_of_motion_states-1])
+    relOrigins = np.zeros([4, voi.N_of_motion_states-1])
     minmaxAmplitudes = [[-1e3, -1e3, -1e3], [1e3, 1e3, 1e3]]
     amplitudes = [0, 0, 0]
 
-    refPhase = 0
+    refPhase = 5
+    exportTrafo = True
 
     #This is the relative difference between planning CT and reference position
     #Amplitudes are shifted for this value, so we can get an estimate, where is our planning CT in 4DCT
@@ -688,25 +711,25 @@ class LoadCTXLogic:
     planOrigins = [0,0,0]
     #print "planorigins: ", planOrigins
 
-    segment = segmentationNode.GetSegmentByTag()
-    
     # Propagation in 4D
-    patient.create4DParameters()
-    for i in range(0, voi.N_of_motion_states):
+    for i in range(1, voi.N_of_motion_states):
 
       if not voi.slicerNodeID[i]:
-        binfo=self.binfoList[self.binfoListFile.currentIndex]
         filePrefix, fileExtension = os.path.splitext(binfo.filePath)
         filePath = filePrefix + voi.name + ".nrrd"
         voi.slicerNodeID[i] = self.loadVoi(filePath,segmentationNode, motionState=i,voi=voi)
-        
+     
+    for i in range(1, voi.N_of_motion_states):
       #Create & propagate contour
-      contour = self.getContourFromVoi(voi,segmentationNode)
+      segmentation = segmentationNode.GetSegmentation()
+      segmentation.CreateRepresentation('Closed surface')
+      voiName = voi.name + "_" + str(i)
+      contour = self.getContourFromVoi(voiName,segmentation)
       if contour is None:
-        print "Can't get contour for phase " + str(i) + "0 %"
+        #print "Can't get contour  " + str(i) + "0 %"
         continue
       
-      origins[:, i] = self.getCenterOfMass(contour)
+      origins[:, i-1] = self.getCenterOfMass(contour)
 
     # Find axis of motion
     if axisOfMotion:
@@ -719,12 +742,14 @@ class LoadCTXLogic:
       patient.matrix = matrix_W
 
     #Find relative motion
-    for i in range(voi.N_of_motion_states):
-      relOrigins[:, i] = origins[:, i] - origins[:, refPhase] + relOrigins[:, refPhase]
+    for i in range(0,voi.N_of_motion_states-1):
+      relOrigins[0:3, i] = origins[:, refPhase] - origins[:, i] + relOrigins[0:3, refPhase]
 
     # Absolute motion & max & min motion
-    relOrigins = np.vstack([relOrigins, np.zeros([1, voi.N_of_motion_states])])
-    for j in range(voi.N_of_motion_states):
+    #print relOrigins
+    #print np.zeros([1, voi.N_of_motion_states-1])
+    #relOrigins = np.vstack([relOrigins, np.zeros([1, voi.N_of_motion_states-1])])
+    for j in range(0,voi.N_of_motion_states-1):
       amplitude = 0
       for i in range(0, 3):
         #Max
@@ -746,17 +771,53 @@ class LoadCTXLogic:
     print amplitudes
     # Plot
     if showPlot:
-      self.plotMotion(relOrigins, contourName)
+      self.plotMotion(relOrigins, voi.name)
 
+    print origins
+    print relOrigins
+    if exportTrafo:
+      dirPath = "/u/kanderle/AIXd/Data/CNAO/Liver/CenterOfMass_Manual/"
+      patName = "Liver"
+      #dirPath = "/u/kanderle/AIXd/Data/FC/"+ patName+"/Registration/CenterOfMass/"
+      for i in range(0,voi.N_of_motion_states-1):
+         fileName = patName + "_0" + str(i) + "_0" + str(refPhase) +".aff"
+         matrixMuster = "1 0 0 X\n0 1 0 Y \n0 0 1 Z \n0 0 0 1"
+         matrixExport = matrixMuster.replace("X",str(relOrigins[0, i]))
+         matrixExport = matrixExport.replace("Y",str(relOrigins[1, i]))
+         matrixExport = matrixExport.replace("Z",str(-relOrigins[2, i]))
+         #outputString = "FinalRegistrationMatrix = " + matrixExport
+         outputString = matrixExport
+         filePath = dirPath + fileName
+         f = open(filePath,"wb+")
+         f.write(outputString)
+         f.close()
+         
+         fileName = patName + "_0" + str(refPhase) +"_0" + str(i) + ".aff"
+         matrixMuster = "1 0 0 X\n0 1 0 Y \n0 0 1 Z \n0 0 0 1"
+         matrixExport = matrixMuster.replace("X",str(-relOrigins[0, i]))
+         matrixExport = matrixExport.replace("Y",str(-relOrigins[1, i]))
+         matrixExport = matrixExport.replace("Z",str(relOrigins[2, i]))
+         #outputString = "FinalRegistrationMatrix = " + matrixExport
+         outputString = matrixExport
+         filePath = dirPath + fileName
+         f = open(filePath,"wb+")
+         f.write(outputString)
+         f.close()
+    
     print "Calculated motion"
     return
     
-  def getContourFromVoi(self,voi,segmentationNode):
-     segment = segmentationNode.GetSegmentByTag()
+  def getContourFromVoi(self,voiName,segmentation):
+     segment = segmentation.GetSegment(voiName)
+     if segment is None:
+        print "Can't get " + voiName + " segment"
+        return None
+        
+     return segment.GetRepresentation('Closed surface')
   
   def getCenterOfMass(self,contour):
       comFilter = vtk.vtkCenterOfMass()
-      comFilter.SetInputData(contour.GetRibbonModelPolyData())
+      comFilter.SetInputData(contour)
       comFilter.SetUseScalarsAsWeights(False)
       comFilter.Update()
       return comFilter.GetCenter()
@@ -770,11 +831,12 @@ class LoadCTXLogic:
 
     # Create arrays of data
     dn = {}
+    dim = relOrigins.shape
     for i in range(0, 4):
       dn[i] = slicer.mrmlScene.AddNode(slicer.vtkMRMLDoubleArrayNode())
       a = dn[i].GetArray()
-      a.SetNumberOfTuples(10)
-      for j in range(0,10):
+      a.SetNumberOfTuples(dim[1])
+      for j in range(0,dim[1]):
         a.SetComponent(j, 0, j)
         a.SetComponent(j, 1, relOrigins[i, j])
         a.SetComponent(j, 2, 0)
@@ -887,11 +949,11 @@ class LoadCTXLogic:
          colorNode = slicer.util.getNode('GSIStandard_OverDose')
          
       if not colorNode:
-        colorNode = self.CreateDefaultGSIColorTable(overDoseOff)	    
+        colorNode = self.CreateDefaultGSIColorTable(overDoseOff)            
       slicerVolumeDisplay.SetAndObserveColorNodeID(colorNode.GetID())
       #slicerVolumeDisplay.SetWindowLevelMinMax(0,round(optDose))
       slicerVolumeDisplay.SetWindowLevelMinMax(0,1.08*optDose)
-      slicerVolumeDisplay.SetThreshold(0.2,1200)
+      slicerVolumeDisplay.SetThreshold(0.01*optDose,1200)
       slicerVolumeDisplay.ApplyThresholdOn()
     else:
       print "No display node for:"+doseNode.GetName()
@@ -989,10 +1051,10 @@ class LoadCTXLogic:
       #print "Slice: " + str(z) +"/" + str(dim[0])
       #for y in range(0,dim[1]):
         #for x in range(0,dim[2]):
-	  #if abs(sbrtArray[z][y][x]) < 0.01: #and abs(ptArray[z][y][x]) < 0.1:
-	    #newArray[z][y][x] = - 500
-	  #else:
-	    #newArray[z][y][x] = sbrtArray[z][y][x] - ptArray[z][y][x]
+          #if abs(sbrtArray[z][y][x]) < 0.01: #and abs(ptArray[z][y][x]) < 0.1:
+            #newArray[z][y][x] = - 500
+          #else:
+            #newArray[z][y][x] = sbrtArray[z][y][x] - ptArray[z][y][x]
     
     #importer=LoadCTXLib.vtkImageImportFromArray()
     #importer.SetArray(newArray)
@@ -1066,8 +1128,8 @@ class LoadCTXLogic:
       #print "Slice: " + str(z) +"/" + str(dim[0])
       #for y in range(0,dim[1]):
         #for x in range(0,dim[2]):
-	  #if voi1Array[z][y][x] == 1 and voi2Array[z][y][x] == 1: #and abs(voi2Array[z][y][x]) < 0.1:
-	    #newArray[z][y][x] = 1
+          #if voi1Array[z][y][x] == 1 and voi2Array[z][y][x] == 1: #and abs(voi2Array[z][y][x]) < 0.1:
+            #newArray[z][y][x] = 1
 
     
     #importer=LoadCTXLib.vtkImageImportFromArray()
@@ -1185,7 +1247,7 @@ class LoadCTXLogic:
     return contourNode
  
  
-	
+        
   def CreateDefaultGSIColorTable(self, overDoseOff):
     colorTableNode = slicer.vtkMRMLColorTableNode()
     if overDoseOff:
@@ -1198,6 +1260,7 @@ class LoadCTXLogic:
     colorTableNode.HideFromEditorsOn();
     colorTableNode.SetNumberOfColors(256);
     colorTableNode.GetLookupTable().SetTableRange(0,255)
+    log = False
     darkBlue = 47.0
     lightBlue = 95.0
     darkGreen = 142.0
@@ -1220,47 +1283,54 @@ class LoadCTXLogic:
          else:
            colorTableNode.AddColor(str(i), 1, 0, 0, 0.2)
     else:
-      for i in range(0,256):
-         if i>=0 and i<darkBlue:
-           colorTableNode.AddColor(str(i), 0, 0 + i/darkBlue, 1, 0.2)
-         elif i>=darkBlue and i<lightBlue:
-           colorTableNode.AddColor(str(i), 0, 1-0.5*(i-darkBlue)/(lightBlue-darkBlue), 1 - (i-darkBlue)/(lightBlue-darkBlue), 0.2)
+      if log:
+        colorTableNode.SetNumberOfColors(1200);
+        colorTableNode.GetLookupTable().SetTableRange(0,1199)
+        for i in range(0,1200):
+         lightBlue = 1.0
+         darkGreen = 10.0
+         lightGreen = 100.0
+         yellow = 1000.0
+         red = 1100.0
+         if i>=0 and i<lightBlue:
+              colorTableNode.AddColor(str(i), 0, 0 + i/lightBlue, 0.5, 0.2)
          elif i>=lightBlue and i<darkGreen:
-           colorTableNode.AddColor(str(i), 0, 0.5 + 0.5*(i-lightBlue)/(darkGreen-lightBlue), 0, 0.2)
+              colorTableNode.AddColor(str(i), 0, 0.5 + 0.5*(i-lightBlue)/(darkGreen-lightBlue), 0, 0.2)
          elif i>=darkGreen and i<lightGreen:
-           colorTableNode.AddColor(str(i), 0 + (i-darkGreen)/(lightGreen-darkGreen), 1, 0, 0.2)
+              colorTableNode.AddColor(str(i), 0 + (i-darkGreen)/(lightGreen-darkGreen), 1, 0, 0.2)
          elif i>=lightGreen and i<yellow:
-           colorTableNode.AddColor(str(i), 1, 1, 0, 0.2)
+              colorTableNode.AddColor(str(i), 1, 1, 0, 0.2)
          elif i<=red:
-           colorTableNode.AddColor(str(i), 1, 0, 0, 0.2)
+              colorTableNode.AddColor(str(i), 1, 0, 0, 0.2)
          else:
-           colorTableNode.AddColor(str(i), 1, 0, 1, 0.2)
-   
+              colorTableNode.AddColor(str(i), 1, 0, 1, 0.2)
+         
+      else:
+         for i in range(0,256):
+            if i>=0 and i<darkBlue:
+              colorTableNode.AddColor(str(i), 0, 0 + i/darkBlue, 1, 0.2)
+            elif i>=darkBlue and i<lightBlue:
+              colorTableNode.AddColor(str(i), 0, 1-0.5*(i-darkBlue)/(lightBlue-darkBlue), 1 - (i-darkBlue)/(lightBlue-darkBlue), 0.2)
+            elif i>=lightBlue and i<darkGreen:
+              colorTableNode.AddColor(str(i), 0, 0.5 + 0.5*(i-lightBlue)/(darkGreen-lightBlue), 0, 0.2)
+            elif i>=darkGreen and i<lightGreen:
+              colorTableNode.AddColor(str(i), 0 + (i-darkGreen)/(lightGreen-darkGreen), 1, 0, 0.2)
+            elif i>=lightGreen and i<yellow:
+              colorTableNode.AddColor(str(i), 1, 1, 0, 0.2)
+            elif i<=red:
+              colorTableNode.AddColor(str(i), 1, 0, 0, 0.2)
+            else:
+              colorTableNode.AddColor(str(i), 1, 0, 1, 0.2)
+      
     slicer.mrmlScene.AddNode( colorTableNode )
     return colorTableNode
-  
-  
-class LoadCTXTest(unittest.TestCase):
+
+class LoadCTXTest(ScriptedLoadableModuleTest):
   """
   This is the test case for your scripted module.
+  Uses ScriptedLoadableModuleTest base class, available at:
+  https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
   """
-
-  def delayDisplay(self,message,msec=1000):
-    """This utility method displays a small dialog and waits.
-    This does two things: 1) it lets the event loop catch up
-    to the state of the test so that rendering and widget updates
-    have all taken place before the test continues and 2) it
-    shows the user/developer/tester the state of the test
-    so that we'll know when it breaks.
-    """
-    print(message)
-    self.info = qt.QDialog()
-    self.infoLayout = qt.QVBoxLayout()
-    self.info.setLayout(self.infoLayout)
-    self.label = qt.QLabel(message,self.info)
-    self.infoLayout.addWidget(self.label)
-    qt.QTimer.singleShot(msec, self.info.close)
-    self.info.exec_()
 
   def setUp(self):
     """ Do whatever is needed to reset the state - typically a scene clear will be enough.
@@ -1275,7 +1345,7 @@ class LoadCTXTest(unittest.TestCase):
 
   def test_LoadCTX1(self):
     """ Ideally you should have several levels of tests.  At the lowest level
-    tests sould exercise the functionality of the logic with different inputs
+    tests should exercise the functionality of the logic with different inputs
     (both valid and invalid).  At higher levels your tests should emulate the
     way the user would interact with your code and confirm that it still works
     the way you intended.
@@ -1289,16 +1359,68 @@ class LoadCTXTest(unittest.TestCase):
     #
     # first, get some data
     #
-    #filePath='/u/kanderle/examples/Py/Lung014_00LungL.ctx'
-    filePath='/u/kanderle/examples/Py/ns_00_Pat122wk0_05.binfo'
+    import urllib
+    downloads = (
+        ('http://slicer.kitware.com/midas3/download?items=5767', 'FA.nrrd', slicer.util.loadVolume),
+        )
+
+    for url,name,loader in downloads:
+      filePath = slicer.app.temporaryPath + '/' + name
+      if not os.path.exists(filePath) or os.stat(filePath).st_size == 0:
+        logging.info('Requesting download %s from %s...\n' % (name, url))
+        urllib.urlretrieve(url, filePath)
+      if loader:
+        logging.info('Loading %s...' % (name,))
+        loader(filePath)
+    self.delayDisplay('Finished with download and loading')
+
+    volumeNode = slicer.util.getNode(pattern="FA")
     logic = LoadCTXLogic()
-    binfo = LoadCTXLib.Binfo()
-    binfo.readFile(filePath)
-    #vois = binfo.get_voi_names
-    voi = binfo.get_voi_by_name('CTV_T50')
-    filePath2 = '/u/kanderle/examples/Py/ns_00_Pat122wk0_05CTV_T50.ctx'
-    logic.loadCube(filePath2,2,0,voi)
-    
-    
+    self.assertIsNotNone( logic.hasImageData(volumeNode) )
     self.delayDisplay('Test passed!')
     
+#class Slicelet(object):
+  #"""A slicer slicelet is a module widget that comes up in stand alone mode
+  #implemented as a python class.
+  #This class provides common wrapper functionality used by all slicer modlets.
+  #"""
+  ## TODO: put this in a SliceletLib
+  ## TODO: parse command line arge
+
+
+  #def __init__(self, widgetClass=None):
+    #self.parent = qt.QFrame()
+    #self.parent.setLayout( qt.QVBoxLayout() )
+
+    ## TODO: should have way to pop up python interactor
+    #self.buttons = qt.QFrame()
+    #self.buttons.setLayout( qt.QHBoxLayout() )
+    #self.parent.layout().addWidget(self.buttons)
+    #self.addDataButton = qt.QPushButton("Add Data")
+    #self.buttons.layout().addWidget(self.addDataButton)
+    #self.addDataButton.connect("clicked()",slicer.app.ioManager().openAddDataDialog)
+    #self.loadSceneButton = qt.QPushButton("Load Scene")
+    #self.buttons.layout().addWidget(self.loadSceneButton)
+    #self.loadSceneButton.connect("clicked()",slicer.app.ioManager().openLoadSceneDialog)
+
+    #if widgetClass:
+      #self.widget = widgetClass(self.parent)
+      #self.widget.setup()
+    #self.parent.show()
+
+#class LoadCTXSlicelet(Slicelet):
+  #""" Creates the interface when module is run as a stand alone gui app.
+  #"""
+
+  #def __init__(self):
+    #super(LoadCTXSlicelet,self).__init__(LoadCTXWidget)
+
+
+#if __name__ == "__main__":
+  ## TODO: need a way to access and parse command line arguments
+  ## TODO: ideally command line args should handle --xml
+
+  #import sys
+  #print( sys.argv )
+
+#slicelet = LoadCTXSlicelet()
