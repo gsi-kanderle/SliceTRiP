@@ -1,83 +1,37 @@
 import os, re
 import unittest
 from __main__ import vtk, qt, ctk, slicer
+from slicer.ScriptedLoadableModule import *
 import numpy as np
+import ComparePatientsLib
+reload(ComparePatientsLib)
 
 #
 # TRiPDVH
 #
 
-class TRiPDVH:
+class TRiPDVH(ScriptedLoadableModule):
   def __init__(self, parent):
+    ScriptedLoadableModule.__init__(self, parent)
     parent.title = "TRiP DVH" # TODO make this more human readable by adding spaces
     parent.categories = ["SliceTRiP"]
     parent.dependencies = []
     parent.contributors = ["Kristjan Anderle (GSI)"] # replace with "Firstname Lastname (Org)"
     parent.helpText = """
-    This is an example of scripted loadable module bundled in an extension.
+    Module to display dvh gd files.
     """
     parent.acknowledgementText = """
-    This file was originally developed by Jean-Christophe Fillion-Robin, Kitware Inc. and Steve Pieper, Isomics, Inc.  and was partially funded by NIH grant 3P41RR013218-12S1.
+   Developed by Kristjan Anderle.
 """ # replace with organization, grant and thanks.
-    self.parent = parent
-
-    # Add this test to the SelfTest module's list for discovery when the module
-    # is created.  Since this module may be discovered before SelfTests itself,
-    # create the list if it doesn't already exist.
-    try:
-      slicer.selfTests
-    except AttributeError:
-      slicer.selfTests = {}
-    slicer.selfTests['TRiPDVH'] = self.runTest
-
-  def runTest(self):
-    tester = TRiPDVHTest()
-    tester.runTest()
 
 #
 # qTRiPDVHWidget
 #
 
-class TRiPDVHWidget:
-  def __init__(self, parent = None):
-    if not parent:
-      self.parent = slicer.qMRMLWidget()
-      self.parent.setLayout(qt.QVBoxLayout())
-      self.parent.setMRMLScene(slicer.mrmlScene)
-    else:
-      self.parent = parent
-    self.layout = self.parent.layout()
-    if not parent:
-      self.setup()
-      self.parent.show()
-
+class TRiPDVHWidget(ScriptedLoadableModuleWidget):
   def setup(self):
+    ScriptedLoadableModuleWidget.setup(self)
     # Instantiate and connect widgets ...
-
-    #
-    # Reload and Test area
-    #
-    reloadCollapsibleButton = ctk.ctkCollapsibleButton()
-    reloadCollapsibleButton.text = "Reload && Test"
-    self.layout.addWidget(reloadCollapsibleButton)
-    reloadFormLayout = qt.QFormLayout(reloadCollapsibleButton)
-
-    # reload button
-    # (use this during development, but remove it when delivering
-    #  your module to users)
-    self.reloadButton = qt.QPushButton("Reload")
-    self.reloadButton.toolTip = "Reload this module."
-    self.reloadButton.name = "TRiPDVH Reload"
-    reloadFormLayout.addWidget(self.reloadButton)
-    self.reloadButton.connect('clicked()', self.onReload)
-
-    # reload and test button
-    # (use this during development, but remove it when delivering
-    #  your module to users)
-    self.reloadAndTestButton = qt.QPushButton("Reload and Test")
-    self.reloadAndTestButton.toolTip = "Reload this module and then run the self tests."
-    reloadFormLayout.addWidget(self.reloadAndTestButton)
-    self.reloadAndTestButton.connect('clicked()', self.onReloadAndTest)
 
     #
     # Parameters Area
@@ -89,28 +43,52 @@ class TRiPDVHWidget:
     # Layout within the dummy collapsible button
     self.parametersFormLayout = qt.QFormLayout(parametersCollapsibleButton)
     
+    
+    self.buttonForm = qt.QGridLayout()
     #
     # Load gd Button
     #
     self.loadGdButton = qt.QPushButton("Load gd file")
     self.loadGdButton.toolTip = "Load gd File."
     self.loadGdButton.enabled = True
-    self.parametersFormLayout.addRow(self.loadGdButton)
     
-   #
-    # Patient Name
+    self.buttonForm.addWidget(self.loadGdButton,0,0)
+    
     #
-    self.dvhName = qt.QLineEdit()     
-    self.dvhName.setToolTip( "Filepath of gd file." )
-    self.dvhName.text = ''
-    self.parametersFormLayout.addRow('DVH Filepath:', self.dvhName)
+    # List of DVHs
+    #
+    # Binfo
+    #self.dvhList = qt.QComboBox()    
+    #self.dvhList.setToolTip( "List of loaded DVHs" )
+    #self.dvhList.enabled = False
+    #self.parametersFormLayout.addRow("DVH:", self.dvhList)
+    
+    
+
     
     # Input optimized Dose:
+    
+    self.grayInfo = qt.QLabel()
+    self.grayInfo.setText("Scale to Gray:")
+    self.buttonForm.addWidget(self.grayInfo,1,0)
+    
+    self.grayCheckbox = qt.QCheckBox()
+    self.grayCheckbox.setToolTip("Uncheck if you want to display in percentage instead of Gray.")
+    self.grayCheckbox.setChecked(False)
+    self.buttonForm.addWidget(self.grayCheckbox,1,1)
+    
     self.inputDose = qt.QDoubleSpinBox()     
     self.inputDose.setToolTip( "Optimization dose." )
-    self.inputDose.setValue(25)
+    self.inputDose.setMaximum(1000)
+    self.inputDose.setMinimum(0)
+    self.inputDose.setValue(100)
     self.inputDose.setRange(0, 1020)
-    self.parametersFormLayout.addRow("Dose (Gy):", self.inputDose)
+    self.inputDose.enabled = False
+    self.buttonForm.addWidget(self.inputDose,1,2)
+    
+    
+    
+    self.parametersFormLayout.addRow(self.buttonForm)
     
     ## Voi list
     #self.voiComboBox = qt.QComboBox()
@@ -123,118 +101,134 @@ class TRiPDVHWidget:
     self.applyButton = qt.QPushButton("Show DVH")
     self.applyButton.toolTip = "Run the algorithm."
     self.applyButton.enabled = False
-    self.parametersFormLayout.addRow(self.applyButton)
+    self.buttonForm.addWidget(self.applyButton,0,1)
     
-   #
-    # Recalculate with different Dose
-    #
-    self.recalcButton = qt.QPushButton("Recalculate dose values")
-    self.recalcButton.toolTip = "Recalculate all the dose values with different input."
-    self.recalcButton.enabled = True
-    self.parametersFormLayout.addRow(self.recalcButton)
+    self.clearButton = qt.QPushButton("Clear")
+    self.clearButton.toolTip = "Clears all module."
+    self.clearButton.enabled = True
+    self.buttonForm.addWidget(self.clearButton,0,2)
     
-    #
-    # Export values
-    #
-    self.exportButton = qt.QPushButton("Export Values")
-    self.exportButton.toolTip = "Export all values."
-    self.exportButton.visible = False 
-    self.parametersFormLayout.addRow(self.exportButton)
+   ##
+    ## Recalculate with different Dose
+    ##
+    #self.recalcButton = qt.QPushButton("Recalculate dose values")
+    #self.recalcButton.toolTip = "Recalculate all the dose values with different input."
+    #self.recalcButton.visible = False
+    #self.parametersFormLayout.addRow(self.recalcButton)
     
-    #
-    # Copy values
-    #
-    self.copyButton = qt.QPushButton("Copy Values")
-    self.copyButton.toolTip = "Copy values on clipboard."
-    self.copyButton.enabled = True
-    self.parametersFormLayout.addRow(self.copyButton)
+    ##
+    ## Export values
+    ##
+    #self.exportButton = qt.QPushButton("Export Values")
+    #self.exportButton.toolTip = "Export all values."
+    #self.exportButton.visible = False 
+    #self.parametersFormLayout.addRow(self.exportButton)
+    
+    ##
+    ## Copy values
+    ##
+    #self.copyButton = qt.QPushButton("Copy Values")
+    #self.copyButton.toolTip = "Copy values on clipboard."
+    #self.copyButton.visible = False
+    #self.parametersFormLayout.addRow(self.copyButton)
+    
+    self.parametersFormLayout.addRow(self.buttonForm)
+    
+    # Tab wiget
+    self.tabWidget = qt.QTabWidget()
+    self.parametersFormLayout.addRow(self.tabWidget)
+    
+    self.saveButton = qt.QPushButton("Save screenshot")
+    self.saveButton.toolTip = "Saves current view as a screenshot."
+    self.parametersFormLayout.addRow(self.saveButton)
     
     
-     ## Voi Table
-    #self.voiTable= qt.QTableWidget()
-    #self.parametersFormLayout.addRow(self.voiTable)
-    #self.voiTable.visible = False
-    
-    #self.horizontalHeaders=['Show:',"Max(Gy)","D99%(Gy)","D10%(Gy)","D30(Gy)","per. Volume (Gy)","Volume(cc)"]
-    #self.voiTable.setColumnCount(len(self.horizontalHeaders))
-    #self.voiTable.setHorizontalHeaderLabels(self.horizontalHeaders)
-    
-    #self.voiTable.setEditTriggers(qt.QAbstractItemView.NoEditTriggers)
-    
-    # Voi Table checkbox list:
-    self.voiTableCheckBox = []
-   
-
-
-
 
     # Add vertical spacer
     self.layout.addStretch(1)
     
-    # DVH
-    self.dvh = []
+    # Patien struct to save all plans
+    self.patient = ComparePatientsLib.Patient("NewPatient")
     
      # connections
+    #self.dvhList.connect('currentIndexChanged(int)', self.setDvhList)
     self.applyButton.connect('clicked(bool)', self.onApplyButton)
     self.loadGdButton.connect('clicked(bool)', self.onLoadGdButton)
-    self.recalcButton.connect('clicked(bool)', self.onRecalcButton)
-    self.exportButton.connect('clicked(bool)', self.onExportButton)
-    self.copyButton.connect('clicked(bool)', self.onCopyButton)
+    self.clearButton.connect('clicked(bool)', self.onClear)
+    #self.recalcButton.connect('clicked(bool)', self.onRecalcButton)
+    #self.exportButton.connect('clicked(bool)', self.onExportButton)
+    self.saveButton.connect('clicked(bool)', self.onSaveButton)
+    self.grayCheckbox.connect('clicked(bool)',self.onChangeScale)
     #self.voiComboBox.connect('currentIndexChanged(QString)', self.setDvhTable)
     
 
   def cleanup(self):
+    self.patient = None
     pass
 
 
   def onLoadGdButton(self):
     #self.dvhTable.visible = False
-    
-    #Comment this if you want more tables:
-    if self.dvh:
-      self.parametersFormLayout.removeWidget(self.dvh[0].voiTable)
-    self.dvh = []
-    
     loadFileName = qt.QFileDialog()
-    filePath=loadFileName.getOpenFileName()
+    filePathList=loadFileName.getOpenFileNames(None,"Select DVH gd File","","GD (*.gd)")
+    optDose = self.inputDose.value
+    for filePath in filePathList:
+       self.loadgd(filePath, optDose)
+    
+  def loadgd(self, filePath, optDose = 1):    
     filePrefix, fileExtension = os.path.splitext(filePath)
     if filePath == '':
       return
     if not fileExtension == '.gd':
       print "Wrong extension"
       return
+      
+    newPlan = ComparePatientsLib.Plan()
+    newPlan.name = os.path.basename(filePath)
+    newPlan.optDose = optDose
+    newPlan.readGDFile(filePath)
+    self.patient.add_plan(newPlan)
     
-    self.readDoseFromFilename(filePrefix)
-    patientFlag = self.readPatientFlagFromFilename(filePrefix)
-    #self.dvh = None
-    #self.voiTableCheckBox = []
-    #self.voiTable.clear()
-    #optDose = 25
-    optDose = self.inputDose.value
-    dvh = DVH(optDose=optDose,patientFlag=patientFlag)
-    dvh.readFile(filePath)
-    #TODO: Dodaj error, ce je neuspesn
-    dvh.setTable(self.parametersFormLayout)
+    table= qt.QTableWidget()
+    self.tabWidget.addTab(table,newPlan.name)
+    self.tabWidget.setCurrentWidget(table)
+    
+    #self.parametersFormLayout.addRow(table)
+    newPlan.voiQtTable = table
+    newPlan.setTable()
     self.applyButton.enabled=True
-    self.dvh.append( dvh )
-    self.dvhName.text = dvh.filePath
 
-  def onApplyButton(self):
     
-    #Selected list goes linearly through all checkboxes
-    selectedList = []
-    for j in range(0,len(self.dvh)):
-      length = len(self.dvh[j].voiTableCheckBox)
-      for i in range(0,length):
-        if self.dvh[j].voiTableCheckBox[i].checkState() == 0:
-	  selectedList.append(False)
-        else:
-	  selectedList.append(True)
-	    
+  def onClear(self):
+     self.tabWidget.clear()
+     self.patient.clear()
+     self.patient = ComparePatientsLib.Patient("NewPatient")
+  
+  def onApplyButton(self):
     logic = TRiPDVHLogic()    
-    logic.addChart(self.dvh,selectedList)
+    logic.addChart(self.patient)
     print("Displaying")
 
+  def onChangeScale(self):
+    if self.grayCheckbox.checkState() == 0:
+      self.inputDose.setValue(100)
+      self.inputDose.enabled = False
+    else:
+      self.inputDose.enabled = True
+      self.inputDose.setValue(2)
+  
+  def onSaveButton(self):
+     filePath = qt.QFileDialog().getSaveFileName(None,"Save Screenshot","","png (*.png)")
+     filePrefix, fileExtension = os.path.splitext(filePath)
+     if not fileExtension == ".png":
+        filePath = filePrefix + ".png"
+
+     name =  os.path.basename(filePrefix)
+     
+     logic = TRiPDVHLogic()
+     logic.saveScreenshot(name,filePath,"DVH Screenshot")
+     print "Screenshot saved to " + filePath
+  
   def onRecalcButton(self):
     self.dvh[-1].optDose = self.inputDose.value
     #self.dvh[-1].voiTable.clearContents()
@@ -255,94 +249,6 @@ class TRiPDVHWidget:
     else:
       self.dvh[0].exportValuesOnClipboard()
 	
-  
-  #Read Patient Name From filename 
-  def readPatientFlagFromFilename(self,fileName):
-    index = fileName.find('Lung0')
-    if index > -1:
-      patientFlag = fileName[index+5:index+7]
-      return int(patientFlag)
-    else:
-      return 0
-      
-      #if fileNameRest.find('_') > -1:
-        #dose = float(fileNameRest[0:fileNameRest.find('_')])
-        ##dose = float(dose)
-        #self.inputDose.setValue(round(dose,1))
-  
-  #Read Dose from file name 
-  def readDoseFromFilename(self,fileName):
-    index = fileName.find('_d')
-    if index > -1:
-      fileNameRest = fileName[index+2:-1]
-      if fileNameRest.find('_') > -1:
-	try:
-          dose = float(fileNameRest[0:fileNameRest.find('_')])
-          #dose = float(dose)
-          self.inputDose.setValue(round(dose,1))
-        except ValueError:
-          print "Not a float"
-
-  def onReload(self,moduleName="TRiPDVH"):
-    """Generic reload method for any scripted module.
-    ModuleWizard will subsitute correct default moduleName.
-    """
-    #globals()[moduleName] = slicer.util.reloadScriptedModule(moduleName)
-    
-    import imp, sys, os, slicer
-
-    widgetName = moduleName + "Widget"
-
-    # reload the source code
-    # - set source file path
-    # - load the module to the global space
-    filePath = eval('slicer.modules.%s.path' % moduleName.lower())
-    p = os.path.dirname(filePath)
-    if not sys.path.__contains__(p):
-      sys.path.insert(0,p)
-    fp = open(filePath, "r")
-    globals()[moduleName] = imp.load_module(
-        moduleName, fp, filePath, ('.py', 'r', imp.PY_SOURCE))
-    fp.close()
-
-    # rebuild the widget
-    # - find and hide the existing widget
-    # - create a new widget in the existing parent
-    parent = slicer.util.findChildren(name='%s Reload' % moduleName)[0].parent().parent()
-    for child in parent.children():
-      try:
-        child.hide()
-      except AttributeError:
-        pass
-    # Remove spacer items
-    item = parent.layout().itemAt(0)
-    while item:
-      parent.layout().removeItem(item)
-      item = parent.layout().itemAt(0)
-
-    # delete the old widget instance
-    if hasattr(globals()['slicer'].modules, widgetName):
-      getattr(globals()['slicer'].modules, widgetName).cleanup()
-
-    # create new widget inside existing parent
-    globals()[widgetName.lower()] = eval(
-        'globals()["%s"].%s(parent)' % (moduleName, widgetName))
-    globals()[widgetName.lower()].setup()
-    setattr(globals()['slicer'].modules, widgetName, globals()[widgetName.lower()])
-    
-    
-  def onReloadAndTest(self,moduleName="TRiPDVH"):
-    try:
-      self.onReload()
-      evalString = 'globals()["%s"].%sTest()' % (moduleName, moduleName)
-      tester = eval(evalString)
-      tester.runTest()
-    except Exception, e:
-      import traceback
-      traceback.print_exc()
-      qt.QMessageBox.warning(slicer.util.mainWindow(), 
-          "Reload and Test", 'Exception!\n\n' + str(e) + "\n\nSee Python Console for Stack Trace")
-
 
 #
 # TRiPDVHLogic
@@ -358,363 +264,72 @@ class TRiPDVHLogic:
   def __init__(self):
     pass
 
-  def addChart(self,dvhs,selectedList):
+  def addChart(self,patient):
     ln = slicer.util.getNode(pattern='vtkMRMLLayoutNode*')
-    ln.SetViewArrangement(25)
+    ln.SetViewArrangement(26)
     cvn = slicer.util.getNode(pattern='vtkMRMLChartViewNode*')
     cn = slicer.mrmlScene.AddNode(slicer.vtkMRMLChartNode())
+    linePattern = ["solid","dashed","dotted","dashed-dotted"]
+    planNumber = 0
+    chartNames = []
     
-    n = 0
-    for j in range(0,len(dvhs)):
-      vois = dvhs[j].get_voi_names()
-      for i in range(0,len(vois)):
-        if selectedList[n]:
-	  dn = dvhs[j].getSlicerDoubleArray(vois[i])
-	  cn.AddArray(vois[i], dn.GetID())
-	n += 1
+    if patient.plans == []:
+       print "No plans."
+       return
 
-    cn.SetProperty('default', 'xAxisLabel', 'Dose [Gy]')
+    for plan in patient.plans:
+      for voi in plan.vois:
+        if voi.voiTableCheckBox.checkState() == 0:
+           continue
+        voi.setSlicerDoubleArray() #set double array for chart
+        newName = voi.name
+        n = 1
+        nameBool = True
+        while nameBool:
+           nameBool = False
+           for name in chartNames:
+              if newName == name:
+                 nameBool = True
+                 newName = voi.name + "_" + str(n)
+                 n += 1
+                 break
+
+	cn.AddArray(newName, voi.dn.GetID())
+	cn.SetProperty(voi.name,'linePattern',linePattern[planNumber])
+	chartNames.append(newName)
+      planNumber += 1
+
+    if plan.optDose == 100:
+       cn.SetProperty('default', 'xAxisLabel', 'Dose [%]')
+    else:
+       cn.SetProperty('default', 'xAxisLabel', 'Dose [Gy]')
     cn.SetProperty('default', 'yAxisLabel', 'Volume [%]')
-    cn.SetProperty('default', 'title', os.path.basename(dvhs[-1].filePath))
     cvn.SetChartNodeID(cn.GetID())
     return
+    
+  def saveScreenshot(self, name, filePath, description):
+    type = slicer.qMRMLScreenShotDialog.FullLayout
+    lm = slicer.app.layoutManager()
+    widget = lm.viewport()
+    # grab and convert to vtk image data
+    qpixMap = qt.QPixmap().grabWidget(widget)
+    qimage = qpixMap.toImage()
+    imageData = vtk.vtkImageData()
+    slicer.qMRMLUtils().qImageToVtkImageData(qimage,imageData)
 
+    annotationLogic = slicer.modules.annotations.logic()
+    annotationLogic.CreateSnapShot(name, description, type, 1, imageData)
+    
+    snapshotNode = slicer.util.getNode(name)
+    
+    if not snapshotNode:
+       print "Can't get snapshotNode"
+       return
+    
+    if not slicer.util.saveNode(snapshotNode, filePath):
+       print "Can't save " + filePath
+       return
 
-class DVH():
-  def __init__(self,optDose=1,patientFlag=0):
-    self.name=''
-    self.optDose = optDose
-    self.patientFlag = patientFlag
-    self.vois=[]
-    self.filePath=''
-    self.voiTable = None
-    self.voiTableCheckBox = []
-    self.horizontalHeaders=['Show:',"Max(Gy)","D99%(Gy)","D10%(Gy)","D30(Gy)","per. Volume (Gy)","Volume(cc)"]
-  
-  def readFile(self,filePath):
-    #print "Lets do it"
-    self.filePath=filePath
-    fp = open(filePath,"r")
-    content = fp.read().split('\n')
-    fp.close()
-    self.name=content[0]
-    n=len(content)
-    i=1
-    #print contet[len(content)-1]
-    while(i < n):
-      line = content[i]
-      #print "This is our line: " + str(i)
-      
-      if re.match("c:",line) is not None:
-	if re.match("VOI",line.split()[1]) is not None:
-	  i += 1
-	  continue
-	else:
-	  v = Voi(line.split()[1], self.optDose)
-	  i = v.readFile(content,i)
-	  v.setOarConstraints(patientFlag = self.patientFlag)
-	  self.add_voi(v)
-	  #print v.name
-          #v.setSlicerOrigin(self.dimx,self.dimy,self.pixel_size)
-      i += 1
-
-  def setTable(self,layout):
-    # Voi Table
-    table = self.voiTable
-    if table:
-      table.clearContents()
-    else:
-      table= qt.QTableWidget()
-      layout.addRow(table)
-    #table.visible = False
-    
-    table.setColumnCount(len(self.horizontalHeaders))
-    table.setHorizontalHeaderLabels(self.horizontalHeaders)
-    table.setEditTriggers(qt.QAbstractItemView.NoEditTriggers)
-
-    table.setRowCount(len(self.vois))
-    table.setVerticalHeaderLabels(self.get_voi_names())
-        
-    for i in range(0,len(self.vois)):
-      checkBox = qt.QCheckBox()
-      checkBox.setCheckState(0)
-      self.voiTableCheckBox.append(checkBox)
-      table.setCellWidget(i,0,checkBox)
-      self.setVoiTable(table,self.vois[i],i)
-      #self.voiComboBox.addItem(voi)
-    
-    table.visible = True
-    table.resizeColumnsToContents()
-    self.voiTable = table
-    
- 
-  def setVoiTable(self,table,voi,n):    
-    #voi=self.dvh.get_voi_by_name(voiName)          
-    #dose=self.inputDose.value
-    dose = self.optDose
-    #if voi.dvhTableItems == []:
-    voi.setDvhTableItems(self.horizontalHeaders) 
-    a = [str(voi.maximumDose)+"/"+str(voi.maxDose),str(voi.d99),str(voi.d10),str(voi.d30),
-           str(voi.calcPerscDose)+"/"+str(voi.perscDose),str(voi.volume)]
-    for i in range(1,len(self.horizontalHeaders)):
-      item = voi.dvhTableItems[i-1]
-      table.setItem(n,i,item)
-      if not len(a) == len(voi.dvhTableItems):
-	print "Not enough table items, check code."
-      item.setText(a[i-1])
-      if voi.overOarDose:
-	item.setBackground(qt.QColor().fromRgbF(1,0,0,1))
-	
-    
-
-  def get_voi_names(self):
-        names = []
-        for voi in self.vois:
-            names.append(voi.name)
-        return names
-        
-  def add_voi(self,voi):
-    self.vois.append(voi)
-    
-  def get_voi_by_name(self,name):
-        for voi in self.vois:
-            if voi.name.lower() == name.lower():
-                return voi
-        raise InputError("Voi doesn't exist")
-      
-  def exportValuesAsText(self, filePath ):
-    output_str = self.setOutputValues()
-    f = open(filePath,"wb+")
-    f.write(output_str)
-    f.close()  
-  
-  def exportValuesOnClipboard(self):
-    output_str = self.setOutputValues()
-    clipboard = qt.QApplication.clipboard()
-    clipboard.setText(output_str,qt.QClipboard.Selection)
-    clipboard.setText(output_str,qt.QClipboard.Clipboard)
-    
-  def setOutputValues(self):
-    dose = self.optDose
-    output_str = 'Name\tMean Dose\tV10%\tV30%\tV99%\tV(onDose)\tMax Point Dose\tVolume (mm3) \n'
-    voiOrder = ["heart","spinalcord","smallerairways","esophagus","trachea",
-                "aorta","vesselslarge","airwayslarge","bracialplexus","carina",
-                "ivc","largebronchus","svc","liver","lungl","lungr"]
-
-    for nameit in voiOrder:
-      for voi in self.vois:
-	if voi.name.lower() == nameit:
-	  if nameit.find("lung") > -1:
-	    output_str += (voi.name+'\t'+str(voi.mean)+'\t'+str(voi.d10)+'\t'+str(voi.d30)+'\t'+str(voi.d99)
-		      +'\t'+str(voi.calcPerscDose)+'\t'+str(voi.maximumDose)+'\t'+str(voi.volume) + ' \n')
-	  #output_str += (voi.name+'\t'+str(voi.mean)+'\t'+str(voi.d10)+'\t'+str(voi.d30)+'\t'+str(voi.d99)
-		      #+'\t'+str(voi.calcPerscDose)+'\t'+str(voi.maximumDose)+'\t'+str(voi.volume) + ' \n')
-	  else:
-	    output_str += (voi.name+'\t'+'\t'+str(voi.calcPerscDose)+'\t'+str(voi.maximumDose)+'\t'+str(voi.volume) + ' \n')
-
-      #output_str += (nameit+'\n')
-    return output_str
-  
-  def getSlicerDoubleArray(self,name):
-    
-    voi=self.get_voi_by_name(name)
-    
-    if voi.dn is not None:
-      return voi.dn
-      
-    voi.dn = slicer.mrmlScene.AddNode(slicer.vtkMRMLDoubleArrayNode())
-    
-    if voi.array is None:
-      voi.array = voi.dn.GetArray()
-      voi.array.SetNumberOfTuples(len(voi.x))
-      for i in range(0,len(voi.x)):
-        voi.array.SetComponent(i, 0, voi.x[i])
-        voi.array.SetComponent(i, 1, voi.y[i])
-        voi.array.SetComponent(i, 2, voi.err[i])
-        
-    return voi.dn
-      
-class Voi():
-  def __init__(self,name,optDose=1):
-    self.name=name    
-    self.optDose = optDose
-    self.dn=None
-    self.array=None
-    self.x=np.zeros(129)
-    self.y=np.zeros(129)
-    self.err=np.zeros(129)
-    self.minimum = 0
-    self.maximumDose = 0
-    self.mean = 0
-    self.stdev = 0
-    self.mdian = 0
-    self.volume = 0
-    self.voxVol=0
-    self.d10=0
-    self.d30=0
-    self.d95105=0
-    self.d99 = 0
-    self.dvhTableItems = []
-    self.perscDose = 0
-    self.perscVolume = 1
-    self.maxDose = 0
-    self.rescaledVolume = 0
-    self.calcPerscDose = 0
-    self.overOarDose = False
-   
-  def readFile(self,content,i):
-    line = content[i]
-    
-    if line is '':
-      return i
-      
-    #self.name = string.join(line.split()[1:],' ')
-    self.minimum = float(line.split()[2])*self.optDose
-    self.maximumDose = round(float(line.split()[3]),2)*self.optDose
-    self.mean = float(line.split()[4])*self.optDose
-    if not line.split()[5] == 'NaNQ':
-      self.stdev = float(line.split()[5])*self.optDose
-    self.mdian = float(line.split()[6])*self.optDose
-    self.volume = round(float(line.split()[7])/1000,2)
-    self.voxVol=float(line.split()[8])
-    i += 2
-    n=0
-    while i < len(content):
-      line = content[i]
-      if re.match("H:",line) is not None:
-	i += 1
-	continue
-      elif re.match("c:",line) is not None:
-        break
-      else:
-	if n>=129:
-	  break	  
-	self.x[n]=float(line.split()[0])
-	self.y[n]=float(line.split()[1])
-	self.err[n]=float(line.split()[1])
-	n += 1
-        #self.array.SetComponent(n, 0, float(line.split()[0]))
-        #self.array.SetComponent(n, 1, float(line.split()[1]))
-        #self.array.SetComponent(n, 2, float(line.split()[2]))
-        #n += 1
-        #if n>128:
-	  #self.array.SetNumberOfTuples(n)
-      i += 1
-      
-    self.x = np.array(self.x)*self.optDose/100
-    return i-1
-  
-  def calculateDose(self):
-    
-    # If doses are to small, ignore.
-    if self.maximumDose < 1e-3:
-      return
-      
-    self.d10 = self.setValue(10)
-    #self.d10 = self.d10*dose
-    self.d30 = self.setValue(30)
-    self.d95105 = self.setValue(95) - self.setValue(105)
-    self.d99 = self.setValue(99)
-    
-    if not self.perscDose == 0:
-      percantage = self.perscVolume*1e2/self.volume
-      calcDose = self.setValue(percantage)
-      if calcDose > self.perscDose:
-	self.overOarDose = True
-      self.calcPerscDose = calcDose    
-        
-     
-  def setValue(self,value):
-    x=self.x
-    y=self.y
-    array = abs(y-value)
-    index = np.argmin(array)
-    if index:
-      result = x[index]
-      return round(result,2)
-    else:
-      return 0
-      
-  def setDvhTableItems(self,horizontalHeaders):
-    self.dvhTableItems=[]
-    for i in range(0,len(horizontalHeaders)-1):
-      item = qt.QTableWidgetItem()
-      self.dvhTableItems.append(item)
-    self.calculateDose()
-    
-  def setOarConstraints(self,patientFlag=None):
-    
-    # Function oarset makes a oar cell with specific oar names, volumes and doses.
-    # Make sure, that position of the oar name coresponds to volumes, maxdose and perscdose
-    
-    names=["spinalcord","heart","esophagus","stomach","smallerairways",
-           "aorta","largebronchus","lungs","lungl","lungr",
-           "liver","brachialplexus","vesselslarge","trachea","airwayslarge",
-           "carina","ivc","svc","airwayssmall","pulmonaryvessel",
-           "smallairways"]
-    if self.name.lower() in names:
-      index = names.index(self.name.lower())
-    else:
-      print "No percription dose found for oar: " + self.name
-      return
-           
-    perscVolume=[0.35,15,5,10,0.5,
-             10,4,1500,1500,1500,
-             700,3,10,4,4,
-             4,10,10,0.5,10,
-             0.5]
-    perscDose=[10,16,11.9,11.2,12.4,
-               31,10.5,7,7,7,
-               9.1,14,31,10.5,10.5,
-               10.5,31,31,12.4,31,
-               12.4]
-    maxDose=[14,22,15.4,12.4,13.3,
-              37,20.2,0,0,0,
-              0,17.5,37,20.2,20.2,
-              20.2,37,37,13.3,37,
-              13.3]
-    self.perscDose = perscDose[index]
-    self.perscVolume = perscVolume[index]
-    self.maxDose = maxDose[index]
-    
-    if not self.maxDose == 0 and self.maximumDose > self.maxDose:
-      self.overOarDose = True
-      print "Maximum dose too high: " + names[index]
-    
-    # Some VOI volumes differ in 4D CT and Planning CT (i.e. if it has less slices). So this flag is used for comparing VOI volumes.
-    # First you specified for which patient you want to check, then you input all volumes.
-    #If you don't know it, or don't need it, just input 0.
-    
-    if patientFlag:
-      patientOarVolumes=np.zeros(len(names))
-      if patientFlag==2:
-        patientOarVolumes=[54,878,58,0,1.8,210,0,0,1362,1438,805]
-      elif patientFlag==4:
-	patientOarVolumes=[40.7,337.7,66.4,0,2.21,300.0,0,2828.1,1266,1552,1208,0,140,0,8.8,0]
-      elif patientFlag==5:
-	patientOarVolumes=[60,499,35,0,0.8,185,0,0,792,1071,0]
-      elif patientFlag==6:
-	patientOarVolumes=[26.4,686,35.3,0,5,209,0,0,2479,2654,0,0,0,42,22,5.5,0]
-      elif patientFlag==12:
-	patientOarVolumes=[27.3,551.8,40.8,0,1.56,283.1,0,0,1781,1456,0,124.5,0,40.2,0,0,0]
-      elif patientFlag==15:
-	patientOarVolumes=[24.5,0,41.2,0,0,64.6,0,0,1968,1812,0,3,0,37.1,0]
-      elif patientFlag==16:
-	patientOarVolumes=[36.6,386,35.6,0,0,276,0,2113,895,1211,0,0,198,22.2,11.2,0]
-      
-      if index < len(patientOarVolumes):
-	rescaledVolume = patientOarVolumes[index]
-      else:
-	rescaledVolume = 0
-	
-      #if not rescaledVolume == 0:
-	#if abs(self.volume-rescaledVolume)/rescaledVolume > 0.1:
-	  #self.y = np.array(self.y)*self.volume/rescaledVolume
-	  #self.volume = rescaledVolume
-	  #print "setting volume for: " + names[index]
-	  
-      
-   
 class TRiPDVHTest(unittest.TestCase):
   """
   This is the test case for your scripted module.

@@ -66,7 +66,7 @@ function convertHeader {
 		VFILEY=""
 		VFILEZ=""
 		#FIND COMPLEMENTARY FILECUBE TO HEADER
-		FLIST=$(ls ${DIRNAME}/${PREFIX}*)
+		FLIST=$(ls ${DIRNAME}/${PREFIX}.*)
 		
 		for iFILE in $FLIST
 		do

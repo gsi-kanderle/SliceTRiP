@@ -9,7 +9,7 @@ class Binfo():
     self.dimy=0
     self.dimz=0
     self.vois=[]
-    
+    self.segmentationNode = None
     self.filePath=''
     
   def readFile(self,filePath):
